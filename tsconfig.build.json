@@ -1,4 +1,5 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/__tests__/**"]
+  // exclude no se hereda: se repite el de la SPA.
+  "exclude": ["src/**/__tests__/**", "src/web"]
 }

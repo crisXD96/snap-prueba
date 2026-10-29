@@ -23,5 +23,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // La SPA corre en el navegador (DOM, JSX) y se compila con su propio tsconfig.
+  "exclude": ["src/web"]
 }

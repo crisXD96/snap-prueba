@@ -1,0 +1,406 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1c2026;
+  --muted: #5f6b7a;
+  --border: #dfe3e8;
+  --accent: #2f5bea;
+  --accent-text: #ffffff;
+  --danger: #c62828;
+  --notice-bg: #fff6db;
+  --radius: 10px;
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c;
+    --surface: #1d2128;
+    --text: #e6e9ee;
+    --muted: #9aa5b4;
+    --border: #2e343d;
+    --accent: #6b8cff;
+    --accent-text: #0d1117;
+    --danger: #ff6b6b;
+    --notice-bg: #3a3218;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+}
+
+.brand {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.user {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 8px;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin: 0 0 12px;
+}
+
+a {
+  color: var(--accent);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.auth {
+  max-width: 400px;
+  margin: 40px auto 0;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+input {
+  font: inherit;
+  font-weight: 400;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+button.secondary {
+  margin-top: 12px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+button.danger {
+  background: var(--danger);
+  color: #ffffff;
+  padding: 6px 10px;
+}
+
+.link-button {
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  font-weight: 500;
+}
+
+.error {
+  color: var(--danger);
+  margin: 0;
+}
+
+.notice {
+  background: var(--notice-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 16px;
+}
+
+.hint,
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.auth-switch {
+  margin: 16px 0 0;
+  font-size: 0.9rem;
+}
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.shorten {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.shorten label {
+  flex: 1;
+}
+
+.created {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.created p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.copy-button {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toolbar button.secondary {
+  margin-top: 0;
+  padding: 6px 12px;
+}
+
+.period {
+  display: flex;
+  gap: 8px;
+}
+
+.period button {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+}
+
+.period button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-label,
+.metric-detail {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.metric-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 140px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars li {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bar {
+  display: block;
+  width: 100%;
+  min-height: 2px;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+}
+
+.bars-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
+.table-wrap {
+  /* Contiene el encabezado oculto de Acciones: sin esto estira la página a lo ancho. */
+  position: relative;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+td.destination {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+td.number {
+  text-align: right;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .shorten {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* En celular y tablet vertical la tabla no cabe: cada URL pasa a ser una tarjeta. */
+@media (max-width: 900px) {
+  .url-table thead {
+    display: none;
+  }
+
+  .url-table,
+  .url-table tbody,
+  .url-table tr,
+  .url-table td {
+    display: block;
+  }
+
+  .url-table tr {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .url-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 0;
+    border: 0;
+  }
+
+  .url-table td:first-child {
+    font-weight: 600;
+  }
+
+  .url-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .url-table td.destination {
+    max-width: none;
+  }
+
+  .url-table td.destination a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .url-table .actions {
+    margin-top: 8px;
+  }
+}

@@ -6,11 +6,16 @@ import { shortUrl } from '../format.ts';
 import { useErrorMessage, useToken } from '../session.tsx';
 import { CopyButton } from './CopyButton.tsx';
 
-export function ShortenForm({ onCreated }: { onCreated: () => void }) {
+interface ShortenFormProps {
+  // Lo guarda el panel para quitar el aviso si después se borra esa URL.
+  created: ShortUrl | null;
+  onCreatedChange: (created: ShortUrl | null) => void;
+}
+
+export function ShortenForm({ created, onCreatedChange }: ShortenFormProps) {
   const token = useToken();
   const toMessage = useErrorMessage();
   const [url, setUrl] = useState('');
-  const [created, setCreated] = useState<ShortUrl | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -18,11 +23,10 @@ export function ShortenForm({ onCreated }: { onCreated: () => void }) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
-    setCreated(null);
+    onCreatedChange(null);
     try {
-      setCreated(await shorten(token, url));
+      onCreatedChange(await shorten(token, url));
       setUrl('');
-      onCreated();
     } catch (caught) {
       setError(toMessage(caught));
     } finally {

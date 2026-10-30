@@ -102,7 +102,6 @@ src/
 ### Limitaciones conocidas
 
 - El backend no tiene alias personalizado, fecha de expiración ni recuperación de contraseña, así que la interfaz tampoco.
-- Después de borrar una URL, el aviso de la última URL creada puede seguir mostrando ese enlace.
 
 ## Scripts
 

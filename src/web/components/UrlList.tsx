@@ -10,7 +10,7 @@ interface UrlListProps {
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
-  onRemoved: () => void;
+  onRemoved: (code: string) => void;
 }
 
 export function UrlList({ items, hasMore, loadingMore, onLoadMore, onRemoved }: UrlListProps) {
@@ -27,7 +27,7 @@ export function UrlList({ items, hasMore, loadingMore, onLoadMore, onRemoved }: 
     try {
       await removeUrl(token, code);
       setConfirming(null);
-      onRemoved();
+      onRemoved(code);
     } catch (caught) {
       setError(toMessage(caught));
     } finally {

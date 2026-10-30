@@ -1,7 +1,8 @@
 import { vi } from 'vitest';
 import type { DashboardOverview, DashboardUrl } from '../api.ts';
 
-type Handler = (init: RequestInit | undefined) => Response;
+// Una promesa permite decidir cuándo llega la respuesta, p. ej. para probar respuestas que llegan tarde.
+type Handler = (init: RequestInit | undefined) => Response | Promise<Response>;
 
 export function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });

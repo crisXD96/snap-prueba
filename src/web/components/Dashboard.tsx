@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getDashboard } from '../api.ts';
-import type { DashboardOverview, DashboardUrl, Days } from '../api.ts';
+import type { DashboardOverview, DashboardUrl, Days, ShortUrl } from '../api.ts';
 import { useErrorMessage, useToken } from '../session.tsx';
 import { Metrics } from './Metrics.tsx';
 import { ShortenForm } from './ShortenForm.tsx';
@@ -21,10 +21,14 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<ShortUrl | null>(null);
+  // Cambia con cada carga de la primera página: una página siguiente pedida antes ya no corresponde.
+  const listGeneration = useRef(0);
 
   useEffect(() => {
     // Descarta la respuesta si mientras tanto cambió el periodo o se pidió recargar.
     let ignore = false;
+    listGeneration.current += 1;
     setError(null);
     setLoading(true);
     getDashboard(token, days)
@@ -49,15 +53,27 @@ export function Dashboard() {
 
   const reload = () => setVersion((v) => v + 1);
 
+  function handleCreatedChange(next: ShortUrl | null) {
+    setCreated(next);
+    if (next !== null) reload();
+  }
+
+  function handleRemoved(code: string) {
+    setCreated((current) => (current?.code === code ? null : current));
+    reload();
+  }
+
   async function loadMore() {
     if (nextCursor === null) return;
+    const generation = listGeneration.current;
     setLoadingMore(true);
     try {
       const page = await getDashboard(token, days, nextCursor);
+      if (generation !== listGeneration.current) return;
       setItems((current) => [...current, ...page.urls.items]);
       setNextCursor(page.urls.nextCursor);
     } catch (caught) {
-      setError(toMessage(caught));
+      if (generation === listGeneration.current) setError(toMessage(caught));
     } finally {
       setLoadingMore(false);
     }
@@ -65,7 +81,7 @@ export function Dashboard() {
 
   return (
     <div className="dashboard">
-      <ShortenForm onCreated={reload} />
+      <ShortenForm created={created} onCreatedChange={handleCreatedChange} />
 
       <div className="toolbar">
         <div className="period" role="group" aria-label="Periodo">
@@ -104,7 +120,7 @@ export function Dashboard() {
             hasMore={nextCursor !== null}
             loadingMore={loadingMore}
             onLoadMore={loadMore}
-            onRemoved={reload}
+            onRemoved={handleRemoved}
           />
         </>
       )}

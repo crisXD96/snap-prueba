@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import type { DashboardUrl } from '../api.ts';
 import { App } from '../App.tsx';
 import { SessionProvider } from '../session.tsx';
 import { ana, fakeToken, jsonResponse, mockFetch, overview, urlItem } from './fetch-mock.ts';
@@ -250,6 +251,60 @@ describe('SPA de Snap', () => {
     expect(await screen.findByText('Aún no has acortado ninguna URL.')).toBeTruthy();
   });
 
+  it('quita el aviso de la URL recién creada cuando se borra esa URL', async () => {
+    let urls: DashboardUrl[] = [];
+    mockFetch({
+      'POST /auth/login': loginOk,
+      'GET /dashboard?days=7': () => jsonResponse(200, overview(urls)),
+      'POST /urls': () => {
+        urls = [urlItem('new0001')];
+        return jsonResponse(201, { code: 'new0001', url: 'https://example.com/new0001' });
+      },
+      'DELETE /urls/new0001': () => {
+        urls = [];
+        return new Response(null, { status: 204 });
+      },
+    });
+    const user = renderApp();
+    await signInAsAna(user);
+    await user.type(await screen.findByLabelText('URL a acortar'), 'example.com/new0001');
+    await user.click(screen.getByRole('button', { name: 'Acortar' }));
+    expect(await screen.findByRole('status')).toBeTruthy();
+
+    await user.click(await screen.findByRole('button', { name: 'Borrar new0001' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar borrado' }));
+
+    expect(await screen.findByText('Aún no has acortado ninguna URL.')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('mantiene el aviso de la URL recién creada cuando se borra otra URL', async () => {
+    let urls = [urlItem('old0001')];
+    mockFetch({
+      'POST /auth/login': loginOk,
+      'GET /dashboard?days=7': () => jsonResponse(200, overview(urls)),
+      'POST /urls': () => {
+        urls = [urlItem('new0001'), ...urls];
+        return jsonResponse(201, { code: 'new0001', url: 'https://example.com/new0001' });
+      },
+      'DELETE /urls/old0001': () => {
+        urls = urls.filter((item) => item.code !== 'old0001');
+        return new Response(null, { status: 204 });
+      },
+    });
+    const user = renderApp();
+    await signInAsAna(user);
+    await user.type(await screen.findByLabelText('URL a acortar'), 'example.com/new0001');
+    await user.click(screen.getByRole('button', { name: 'Acortar' }));
+    await screen.findByRole('link', { name: 'new0001' });
+
+    await user.click(screen.getByRole('button', { name: 'Borrar old0001' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar borrado' }));
+
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'old0001' })).toBeNull());
+    expect(screen.getByRole('status').textContent).toContain(`${window.location.origin}/new0001`);
+  });
+
   it('carga la siguiente página de URLs con el cursor', async () => {
     mockFetch({
       'POST /auth/login': loginOk,
@@ -265,6 +320,30 @@ describe('SPA de Snap', () => {
     expect(await screen.findByRole('link', { name: 'page002' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'page001' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Cargar más' })).toBeNull();
+  });
+
+  it('descarta la página siguiente si la lista se recargó mientras llegaba', async () => {
+    let deliverNextPage: (res: Response) => void = () => {};
+    mockFetch({
+      'POST /auth/login': loginOk,
+      'GET /dashboard?days=7': () =>
+        jsonResponse(200, overview([urlItem('page001')], { urls: { items: [urlItem('page001')], nextCursor: 'c1' } })),
+      'GET /dashboard?days=7&cursor=c1': () =>
+        new Promise<Response>((resolve) => {
+          deliverNextPage = resolve;
+        }),
+    });
+    const user = renderApp();
+    await signInAsAna(user);
+    await user.click(await screen.findByRole('button', { name: 'Cargar más' }));
+    await user.click(screen.getByRole('button', { name: 'Actualizar métricas' }));
+    await screen.findByRole('button', { name: 'Actualizar métricas' });
+
+    deliverNextPage(jsonResponse(200, overview([urlItem('page002')])));
+
+    expect(await screen.findByRole('button', { name: 'Cargar más' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'page002' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'page001' })).toHaveLength(1);
   });
 
   it('pide el dashboard del periodo elegido', async () => {

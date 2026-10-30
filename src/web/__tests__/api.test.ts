@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, getDashboard, login, removeUrl, shorten } from '../api.ts';
+import { ApiError, getDashboard, getDashboardUrls, login, removeUrl, shorten } from '../api.ts';
 import { jsonResponse, mockFetch } from './fetch-mock.ts';
 
 describe('cliente de la API', () => {
@@ -46,15 +46,21 @@ describe('cliente de la API', () => {
     await expect(removeUrl('mi-token', 'aB3xK9z')).resolves.toBeUndefined();
   });
 
-  it('pide el dashboard sin cursor en la primera página y con cursor en las siguientes', async () => {
+  it('pide las métricas del periodo y la lista de URLs por separado', async () => {
     const fetchMock = mockFetch({
       'GET /dashboard?days=30': () => jsonResponse(200, {}),
-      'GET /dashboard?days=30&cursor=abc': () => jsonResponse(200, {}),
+      'GET /dashboard/urls': () => jsonResponse(200, {}),
+      'GET /dashboard/urls?cursor=abc': () => jsonResponse(200, {}),
     });
 
     await getDashboard('mi-token', 30);
-    await getDashboard('mi-token', 30, 'abc');
+    await getDashboardUrls('mi-token');
+    await getDashboardUrls('mi-token', 'abc');
 
-    expect(fetchMock.mock.calls.map(([input]) => input)).toEqual(['/dashboard?days=30', '/dashboard?days=30&cursor=abc']);
+    expect(fetchMock.mock.calls.map(([input]) => input)).toEqual([
+      '/dashboard?days=30',
+      '/dashboard/urls',
+      '/dashboard/urls?cursor=abc',
+    ]);
   });
 });

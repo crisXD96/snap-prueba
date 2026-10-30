@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { DashboardOverview, DashboardUrl } from '../api.ts';
+import type { DashboardOverview, DashboardUrl, DashboardUrlsPage } from '../api.ts';
 
 // Una promesa permite decidir cuándo llega la respuesta, p. ej. para probar respuestas que llegan tarde.
 type Handler = (init: RequestInit | undefined) => Response | Promise<Response>;
@@ -55,7 +55,10 @@ export function overview(items: DashboardUrl[] = [], overrides: Partial<Dashboar
       changePercent: null,
       clicksByDay: ['23', '24', '25', '26', '27', '28', '29'].map((d) => ({ day: `2026-10-${d}`, clicks: 0 })),
     },
-    urls: { items, nextCursor: null },
     ...overrides,
   };
+}
+
+export function urlsPage(items: DashboardUrl[] = [], nextCursor: string | null = null): DashboardUrlsPage {
+  return { items, nextCursor };
 }

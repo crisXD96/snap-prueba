@@ -41,7 +41,7 @@ Una vez corregida, el reporte se documenta en el commit del arreglo.
 
 - Todas las consultas SQL usan parámetros (`?`); el código nunca concatena valores del usuario en SQL.
 - Solo se acortan URLs `http` y `https`.
-- Ninguna ruta lista las URLs de otros usuarios: el único listado es `GET /dashboard`, con las del usuario autenticado.
+- Ninguna ruta lista las URLs de otros usuarios: el único listado es `GET /dashboard/urls`, con las del usuario autenticado.
 - De cada click solo se guarda el origen del referrer (sin ruta ni query, que pueden traer datos personales) y el user agent recortado a 512 caracteres.
 - La interfaz web muestra el contenido del usuario como texto (React lo escapa) y abre los enlaces externos con `rel="noreferrer"`.
 - El esquema de la base se cambia solo con los scripts de `db-scripts/`, que revisa el DBA; la aplicación no ejecuta DDL.

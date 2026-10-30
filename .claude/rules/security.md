@@ -15,7 +15,7 @@ Estas reglas complementan `SECURITY.md`. Si un cambio afecta alguna de las prác
 - El login pasa por `login-limiter.ts`: 5 passwords incorrectos por IP + email en 15 min dan `429` con `Retry-After`. Solo cuenta `InvalidCredentialsError`. No activar `trust proxy` salvo que el despliegue esté detrás de un proxy.
 - Los JWT se firman con HS256 y duran 24 h; `jwt.verify` siempre recibe `algorithms: ['HS256']`. El payload lleva `sub` (id del usuario) y `email`; el middleware valida los dos aunque la firma sea correcta.
 - Una ruta que lee o modifica datos de un usuario usa `requireAuth` y toma el id de `getAuthUser(req)`, nunca del body ni de la query.
-- No hay listados públicos ni globales: una ruta que lista recursos devuelve solo los del usuario del token. El listado de URLs es `GET /dashboard`; no volver a agregar `GET /urls`.
+- No hay listados públicos ni globales: una ruta que lista recursos devuelve solo los del usuario del token. El listado de URLs es `GET /dashboard/urls`; no volver a agregar `GET /urls`.
 - Antes de modificar o borrar un recurso, el service verifica que sea del usuario: `404` si no existe y `403` si es de otro.
 
 ## Datos y entradas

@@ -46,7 +46,11 @@ export interface DashboardOverview {
     changePercent: number | null;
     clicksByDay: { day: string; clicks: number }[];
   };
-  urls: { items: DashboardUrl[]; nextCursor: string | null };
+}
+
+export interface DashboardUrlsPage {
+  items: DashboardUrl[];
+  nextCursor: string | null;
 }
 
 export const UNEXPECTED_ERROR = 'Ocurrió un error inesperado. Intenta de nuevo.';
@@ -101,9 +105,12 @@ export function removeUrl(token: string, code: string): Promise<void> {
   return request(`/urls/${encodeURIComponent(code)}`, { method: 'DELETE', token });
 }
 
-export function getDashboard(token: string, days: Days, cursor?: string): Promise<DashboardOverview> {
+export function getDashboard(token: string, days: Days): Promise<DashboardOverview> {
+  return request(`/dashboard?${new URLSearchParams({ days: String(days) })}`, { token });
+}
+
+export function getDashboardUrls(token: string, cursor?: string): Promise<DashboardUrlsPage> {
   // El backend rechaza un cursor vacío: si no hay, se omite.
-  const query = new URLSearchParams({ days: String(days) });
-  if (cursor !== undefined) query.set('cursor', cursor);
-  return request(`/dashboard?${query}`, { token });
+  const query = cursor === undefined ? '' : `?${new URLSearchParams({ cursor })}`;
+  return request(`/dashboard/urls${query}`, { token });
 }

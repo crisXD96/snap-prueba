@@ -12,8 +12,16 @@ export function createDashboardRouter(db: DatabaseSync, requireAuth: RequestHand
 
   router.get('/dashboard', requireAuth, (req, res) => {
     try {
-      const overview = service.getOverview(getAuthUser(req).id, { days: req.query.days, cursor: req.query.cursor });
-      res.status(200).json(overview);
+      res.status(200).json(service.getOverview(getAuthUser(req).id, { days: req.query.days }));
+    } catch (error) {
+      if (!(error instanceof InvalidDashboardQueryError)) throw error;
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  router.get('/dashboard/urls', requireAuth, (req, res) => {
+    try {
+      res.status(200).json(service.getUrlsPage(getAuthUser(req).id, { cursor: req.query.cursor }));
     } catch (error) {
       if (!(error instanceof InvalidDashboardQueryError)) throw error;
       res.status(400).json({ error: error.message });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getDashboard } from '../api.ts';
+import { getDashboard, getDashboardUrls } from '../api.ts';
 import type { DashboardOverview, DashboardUrl, Days, ShortUrl } from '../api.ts';
 import { useErrorMessage, useToken } from '../session.tsx';
 import { Metrics } from './Metrics.tsx';
@@ -13,43 +13,66 @@ export function Dashboard() {
   const token = useToken();
   const toMessage = useErrorMessage();
   const [days, setDays] = useState<Days>(7);
-  // Cambiarla vuelve a pedir la primera página, p. ej. tras crear o borrar una URL.
+  // Cambiarla vuelve a pedir métricas y primera página, p. ej. tras crear o borrar una URL.
   const [version, setVersion] = useState(0);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
-  const [items, setItems] = useState<DashboardUrl[]>([]);
+  const [items, setItems] = useState<DashboardUrl[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingMetrics, setLoadingMetrics] = useState(true);
+  const [loadingList, setLoadingList] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const [created, setCreated] = useState<ShortUrl | null>(null);
   // Cambia con cada carga de la primera página: una página siguiente pedida antes ya no corresponde.
   const listGeneration = useRef(0);
 
+  // Las métricas dependen del periodo; la lista no, así que cambiar el periodo no la recarga.
   useEffect(() => {
     // Descarta la respuesta si mientras tanto cambió el periodo o se pidió recargar.
     let ignore = false;
-    listGeneration.current += 1;
-    setError(null);
-    setLoading(true);
+    setMetricsError(null);
+    setLoadingMetrics(true);
     getDashboard(token, days)
       .then(
         (result) => {
-          if (ignore) return;
-          setOverview(result);
-          setItems(result.urls.items);
-          setNextCursor(result.urls.nextCursor);
+          if (!ignore) setOverview(result);
         },
         (caught: unknown) => {
-          if (!ignore) setError(toMessage(caught));
+          if (!ignore) setMetricsError(toMessage(caught));
         },
       )
       .finally(() => {
-        if (!ignore) setLoading(false);
+        if (!ignore) setLoadingMetrics(false);
       });
     return () => {
       ignore = true;
     };
   }, [token, days, version, toMessage]);
+
+  useEffect(() => {
+    let ignore = false;
+    listGeneration.current += 1;
+    setListError(null);
+    setLoadingList(true);
+    getDashboardUrls(token)
+      .then(
+        (page) => {
+          if (ignore) return;
+          setItems(page.items);
+          setNextCursor(page.nextCursor);
+        },
+        (caught: unknown) => {
+          if (!ignore) setListError(toMessage(caught));
+        },
+      )
+      .finally(() => {
+        if (!ignore) setLoadingList(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [token, version, toMessage]);
 
   const reload = () => setVersion((v) => v + 1);
 
@@ -68,16 +91,20 @@ export function Dashboard() {
     const generation = listGeneration.current;
     setLoadingMore(true);
     try {
-      const page = await getDashboard(token, days, nextCursor);
+      const page = await getDashboardUrls(token, nextCursor);
       if (generation !== listGeneration.current) return;
-      setItems((current) => [...current, ...page.urls.items]);
-      setNextCursor(page.urls.nextCursor);
+      setItems((current) => [...(current ?? []), ...page.items]);
+      setNextCursor(page.nextCursor);
     } catch (caught) {
-      if (generation === listGeneration.current) setError(toMessage(caught));
+      if (generation === listGeneration.current) setListError(toMessage(caught));
     } finally {
       setLoadingMore(false);
     }
   }
+
+  const loading = loadingMetrics || loadingList;
+  // Si fallan las dos cargas suele ser por lo mismo (p. ej. sin conexión): un solo aviso basta.
+  const error = metricsError ?? listError;
 
   return (
     <div className="dashboard">
@@ -110,19 +137,21 @@ export function Dashboard() {
       )}
 
       {overview === null ? (
-        !error && <p className="muted">Cargando…</p>
+        !metricsError && <p className="muted">Cargando…</p>
       ) : (
         <>
           <Metrics overview={overview} />
           <TrendChart clicksByDay={overview.trend.clicksByDay} />
-          <UrlList
-            items={items}
-            hasMore={nextCursor !== null}
-            loadingMore={loadingMore}
-            onLoadMore={loadMore}
-            onRemoved={handleRemoved}
-          />
         </>
+      )}
+      {items !== null && (
+        <UrlList
+          items={items}
+          hasMore={nextCursor !== null}
+          loadingMore={loadingMore}
+          onLoadMore={loadMore}
+          onRemoved={handleRemoved}
+        />
       )}
     </div>
   );

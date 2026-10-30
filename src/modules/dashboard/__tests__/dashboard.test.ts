@@ -45,6 +45,10 @@ describe('GET /dashboard', () => {
     });
   }
 
+  function getUrlsPage(token: string | null, query = ''): Promise<Response> {
+    return getDashboard(token, `/urls${query}`);
+  }
+
   beforeAll(async () => {
     server = createApp(createTestDatabase(), randomBytes(32).toString('hex')).listen(0, '127.0.0.1');
     await once(server, 'listening');
@@ -57,8 +61,11 @@ describe('GET /dashboard', () => {
     await once(server, 'close');
   });
 
-  it('responde 401 cuando no hay token', async () => {
-    const res = await getDashboard(null);
+  it.each([
+    ['/dashboard', getDashboard],
+    ['/dashboard/urls', getUrlsPage],
+  ])('GET %s responde 401 cuando no hay token', async (_path, get) => {
+    const res = await get(null);
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'Token requerido' });
@@ -83,14 +90,23 @@ describe('GET /dashboard', () => {
     expect(body.trend).toMatchObject({ clicks: 0, previousClicks: 0, changePercent: null });
     expect(body.trend.clicksByDay).toHaveLength(7);
     expect(body.trend.clicksByDay.every((d) => d.clicks === 0)).toBe(true);
-    expect(body.urls).toEqual({ items: [], nextCursor: null });
+    expect(await (await getUrlsPage(token)).json()).toEqual({ items: [], nextCursor: null });
   });
 
-  it('devuelve los totales, la tendencia y el rendimiento de las urls del usuario autenticado', async () => {
+  it('GET /dashboard devuelve solo las métricas, sin la lista de urls', async () => {
+    const token = await registerUser('solo-metricas');
+    await createShortUrl('https://example.com/una', token);
+
+    const body = (await (await getDashboard(token)).json()) as Record<string, unknown>;
+
+    expect(Object.keys(body).sort()).toEqual(['period', 'totals', 'trend']);
+  });
+
+  it('devuelve los totales y la tendencia de las urls del usuario autenticado', async () => {
     const token = await registerUser('con-urls');
     const otherToken = await registerUser('otro-usuario');
     const visited = await createShortUrl('https://example.com/visitada', token);
-    const unvisited = await createShortUrl('https://example.com/sin-visitas', token);
+    await createShortUrl('https://example.com/sin-visitas', token);
     const foreign = await createShortUrl('https://example.com/ajena', otherToken);
     await visit(visited, 3);
     await visit(foreign, 2);
@@ -102,10 +118,24 @@ describe('GET /dashboard', () => {
     expect(body.totals).toEqual({ urls: 2, clicks: 3, urlsWithoutClicks: 1, lastClickAt: expect.any(String) });
     expect(body.trend).toMatchObject({ clicks: 3, previousClicks: 0, changePercent: null });
     expect(body.trend.clicksByDay.at(-1)).toEqual({ day: body.period.to, clicks: 3 });
-    expect(body.urls).toEqual({
+  });
+
+  it('GET /dashboard/urls devuelve el rendimiento de las urls del usuario autenticado y no las de otros', async () => {
+    const token = await registerUser('lista-urls');
+    const otherToken = await registerUser('lista-otro');
+    const visited = await createShortUrl('https://example.com/lista-visitada', token);
+    const unvisited = await createShortUrl('https://example.com/lista-sin-visitas', token);
+    const foreign = await createShortUrl('https://example.com/lista-ajena', otherToken);
+    await visit(visited, 3);
+    await visit(foreign, 2);
+
+    const res = await getUrlsPage(token);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
       items: [
-        { code: unvisited, url: 'https://example.com/sin-visitas', createdAt: expect.any(String), clicks: 0, lastClickAt: null },
-        { code: visited, url: 'https://example.com/visitada', createdAt: expect.any(String), clicks: 3, lastClickAt: body.totals.lastClickAt },
+        { code: unvisited, url: 'https://example.com/lista-sin-visitas', createdAt: expect.any(String), clicks: 0, lastClickAt: null },
+        { code: visited, url: 'https://example.com/lista-visitada', createdAt: expect.any(String), clicks: 3, lastClickAt: expect.any(String) },
       ],
       nextCursor: null,
     });
@@ -132,7 +162,7 @@ describe('GET /dashboard', () => {
   it('rechaza con 400 un cursor que no generó el servidor', async () => {
     const token = await registerUser('cursor-invalido');
 
-    const res = await getDashboard(token, '?cursor=no-es-un-cursor');
+    const res = await getUrlsPage(token, '?cursor=no-es-un-cursor');
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: 'El cursor no es válido' });
@@ -172,7 +202,7 @@ describe('servicio de dashboard', () => {
     addClick('aaaaaaa', '2026-10-29T03:00:00.000Z');
     addClick('aaaaaaa', '2026-10-29T07:00:00.000Z');
 
-    const { period, trend } = service.getOverview(userId, { days: undefined, cursor: undefined });
+    const { period, trend } = service.getOverview(userId, { days: undefined });
 
     expect(period).toEqual({ days: 7, from: '2026-10-23', to: '2026-10-29', utcOffset: '-06:00' });
     expect(trend.clicksByDay).toEqual([
@@ -199,7 +229,7 @@ describe('servicio de dashboard', () => {
     addClick('aaaaaaa', '2026-10-16T06:00:00.000Z');
     addClick('aaaaaaa', '2026-10-10T12:00:00.000Z');
 
-    const { totals, trend } = service.getOverview(userId, { days: '7', cursor: undefined });
+    const { totals, trend } = service.getOverview(userId, { days: '7' });
 
     expect(trend).toMatchObject({ clicks: 4, previousClicks: 3, changePercent: 33.3 });
     expect(totals).toEqual({ urls: 1, clicks: 8, urlsWithoutClicks: 0, lastClickAt: '2026-10-25T14:00:00.000Z' });
@@ -211,8 +241,8 @@ describe('servicio de dashboard', () => {
     const codes = Array.from({ length: 52 }, (_, i) => `u${String(i).padStart(6, '0')}`);
     codes.forEach((code) => addUrl(code));
 
-    const first = service.getOverview(userId, { days: undefined, cursor: undefined }).urls;
-    const second = service.getOverview(userId, { days: undefined, cursor: first.nextCursor ?? undefined }).urls;
+    const first = service.getUrlsPage(userId, { cursor: undefined });
+    const second = service.getUrlsPage(userId, { cursor: first.nextCursor ?? undefined });
 
     expect(first.items).toHaveLength(50);
     expect(first.nextCursor).toEqual(expect.any(String));

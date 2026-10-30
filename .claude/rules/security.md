@@ -12,6 +12,7 @@ Estas reglas complementan `SECURITY.md`. Si un cambio afecta alguna de las prác
 
 - Passwords con bcrypt, costo 10. Mínimo 8 caracteres y máximo 72 bytes (lo que pasa de ahí bcrypt lo ignora). No bajar ninguno de esos límites.
 - El login responde el mismo `401` y el mismo mensaje para un email inexistente y un password incorrecto.
+- El login pasa por `login-limiter.ts`: 5 passwords incorrectos por IP + email en 15 min dan `429` con `Retry-After`. Solo cuenta `InvalidCredentialsError`. No activar `trust proxy` salvo que el despliegue esté detrás de un proxy.
 - Los JWT se firman con HS256 y duran 24 h; `jwt.verify` siempre recibe `algorithms: ['HS256']`. El payload lleva `sub` (id del usuario) y `email`; el middleware valida los dos aunque la firma sea correcta.
 - Una ruta que lee o modifica datos de un usuario usa `requireAuth` y toma el id de `getAuthUser(req)`, nunca del body ni de la query.
 - No hay listados públicos ni globales: una ruta que lista recursos devuelve solo los del usuario del token. El listado de URLs es `GET /dashboard`; no volver a agregar `GET /urls`.
@@ -24,6 +25,10 @@ Estas reglas complementan `SECURITY.md`. Si un cambio afecta alguna de las prác
 - Solo se acortan URLs `http` y `https`. No relajar `normalizeHttpUrl` para aceptar otros esquemas (`javascript:`, `data:`, `file:`).
 - Lo que manda quien visita un enlace se recorta y se limpia antes de guardarse: del referrer solo el origen, el user agent a 512 caracteres. Un header nuevo que se guarde sigue la misma regla.
 - No agregar datos personales a los logs. `console.error` solo con el error, sin el body ni los headers de la petición.
+
+## Headers HTTP
+
+- `securityHeaders` (`shared/security-headers.middleware.ts`) va primero en `app.ts`, para que todas las respuestas lleven los headers. No relajar la CSP (`unsafe-inline`, otros orígenes): si algo nuevo la necesita, se cambia ese algo.
 
 ## SPA
 

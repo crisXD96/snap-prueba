@@ -28,7 +28,14 @@ Una vez corregida, el reporte se documenta en el commit del arreglo.
 - Los passwords se guardan con bcrypt (costo 10). Se exigen al menos 8 caracteres y se rechazan los que pasan de 72 bytes, porque bcrypt ignora lo que sigue.
 - El login devuelve el mismo error para un email inexistente y para un password incorrecto, para no revelar qué cuentas existen.
 - Los JWT se firman con HS256, duran 24 h, y la verificación fija el algoritmo para que el token no pueda elegirlo.
+- El login admite 5 passwords incorrectos por IP y email cada 15 minutos; después responde `429` con `Retry-After`. Un login correcto reinicia el conteo.
 - En la interfaz web el token vive **solo en memoria**: nunca se guarda en `localStorage`, `sessionStorage` ni cookies.
+
+### Headers HTTP
+
+- Todas las respuestas llevan una `Content-Security-Policy` estricta (`default-src 'self'`, sin `unsafe-inline`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` y `Cross-Origin-Opener-Policy: same-origin`.
+- La SPA no usa scripts, estilos ni atributos `style` inline, para que la CSP no tenga que permitirlos.
+- El servidor no envía `X-Powered-By`.
 
 ### Datos y entradas
 
@@ -41,5 +48,7 @@ Una vez corregida, el reporte se documenta en el commit del arreglo.
 
 ## Limitaciones conocidas
 
-- La API no limita los intentos de login ni agrega headers de seguridad HTTP (CSP, `X-Content-Type-Options`, etc.).
+- El límite de intentos de login vive en la memoria del proceso: se reinicia con el servidor y no se comparte entre instancias.
+- Detrás de un proxy o balanceador, el límite ve la IP del proxy hasta que se configure `trust proxy` (ver el README).
+- No se envía `Strict-Transport-Security`: depende de que el despliegue sirva HTTPS.
 - `npm audit` reporta vulnerabilidades en `tinypool` (2 críticas) y `@vitest/mocker` (1 moderada), que llegan por `vitest`. Son dependencias de desarrollo que no llegan a producción: `npm audit --omit=dev` no encuentra ninguna. Corregirlas exige actualizar a Vitest 5.

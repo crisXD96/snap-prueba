@@ -56,6 +56,8 @@ npm start         # sirve API y SPA en http://localhost:<PORT>
 
 Abre `http://localhost:3000` (o el `PORT` configurado).
 
+Si se despliega detrás de un proxy o balanceador, hay que activar `app.set('trust proxy', 1)` en `src/app.ts`, con el número de proxies delante. Sin eso, el límite de intentos de login ve a todos los usuarios con la IP del proxy. Sin proxy no se activa: cualquiera podría falsificar su IP con `X-Forwarded-For`.
+
 ### Pantallas
 
 - **Inicio de sesión y registro**: formularios con los mensajes de error que devuelve la API (credenciales incorrectas, email ya registrado, validaciones).

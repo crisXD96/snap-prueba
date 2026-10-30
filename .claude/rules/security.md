@@ -32,7 +32,8 @@ Estas reglas complementan `SECURITY.md`. Si un cambio afecta alguna de las prác
 
 ## SPA
 
-- El token vive solo en memoria (estado de React en `session.tsx`). Prohibido `localStorage`, `sessionStorage`, IndexedDB y cookies para el token o los datos del usuario.
+- El token solo viaja en la cookie `snap_session` (`HttpOnly`, `Secure`, `SameSite=Strict`), que maneja `session-cookie.ts`. La SPA nunca lee, guarda ni envía el token: prohibido `localStorage`, `sessionStorage`, IndexedDB y cookies legibles desde JavaScript para el token o los datos del usuario. Al cargar, la sesión se recupera con `GET /auth/me`.
+- Toda ruta que use la cookie y tenga efectos (`POST`, `DELETE`) comprueba el `Origin`: lo hace `requireAuth`, y las rutas que crean o borran la cookie usan `sameOriginOnly`. Una ruta nueva de ese tipo no se salta esta comprobación. Las peticiones con el header `Bearer` no la necesitan.
 - El contenido del usuario se pinta como texto con JSX. Prohibido `dangerouslySetInnerHTML` e `innerHTML`.
 - Los enlaces a URLs del usuario abren con `target="_blank"` y `rel="noreferrer"`.
 - La SPA no confía en el JWT: solo lee `exp` para cerrar la sesión a tiempo. Cualquier decisión de permisos la toma el backend.

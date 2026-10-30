@@ -30,7 +30,8 @@ paths:
 
 - Testing Library + `userEvent`: renderizar `<SessionProvider><App /></SessionProvider>` o el componente, e interactuar como el usuario. Buscar por rol, etiqueta o texto visible (`getByRole`, `getByLabelText`); nada de selectores CSS ni `data-testid`.
 - La red es el único borde que se simula, con `mockFetch` de `__tests__/fetch-mock.ts`: cada clave es `"MÉTODO ruta"` tal como la pide la SPA. Una petición no declarada hace fallar el test, así que se declaran todas las que el flujo dispara. Para probar una respuesta que llega tarde, el handler devuelve una promesa que el test resuelve cuando quiere.
-- Tokens con `fakeToken(segundos)`; datos con las fábricas `ana`, `urlItem`, `overview`. Si cambia el contrato de la API, se actualizan las fábricas.
+- `mockFetch` responde por defecto `GET /auth/me` con 401 (no hay sesión) y `POST /auth/logout` con 204; un test que necesite una sesión ya iniciada declara su propio `GET /auth/me`. Como el login aparece después de esa consulta, se busca con `findBy…`, no con `getBy…`.
+- Sesión con `authResult(segundos)` (body del login, del registro y de `/auth/me`); datos con las fábricas `ana`, `urlItem`, `overview` y `urlsPage`. Si cambia el contrato de la API, se actualizan las fábricas.
 - `setup.ts` desmonta y quita los stubs globales después de cada test; no repetirlo en cada archivo.
 
 ## Mocks permitidos

@@ -203,6 +203,49 @@ describe('API de autenticación', () => {
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: 'Email y password son obligatorios' });
     });
+
+    it('responde 429 con Retry-After después de 5 passwords incorrectos, aunque el sexto sea correcto', async () => {
+      const user = newUser('login-bloqueado');
+      await post('/auth/register', user);
+      for (let i = 0; i < 5; i++) {
+        expect((await post('/auth/login', { email: user.email, password: 'incorrecto-123' })).status).toBe(401);
+      }
+
+      const res = await post('/auth/login', { email: user.email, password: user.password });
+
+      expect(res.status).toBe(429);
+      expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+      expect(await res.json()).toEqual({ error: expect.stringMatching(/^Demasiados intentos fallidos/) });
+    });
+
+    it('cuenta los intentos sin importar mayúsculas en el email', async () => {
+      const user = newUser('login-mayusculas');
+      await post('/auth/register', user);
+      for (let i = 0; i < 5; i++) {
+        await post('/auth/login', { email: i % 2 ? user.email : user.email.toUpperCase(), password: 'incorrecto-123' });
+      }
+
+      expect((await post('/auth/login', { email: user.email, password: user.password })).status).toBe(429);
+    });
+
+    it('un login correcto reinicia el conteo de intentos fallidos', async () => {
+      const user = newUser('login-reinicia');
+      await post('/auth/register', user);
+      for (let i = 0; i < 4; i++) await post('/auth/login', { email: user.email, password: 'incorrecto-123' });
+      expect((await post('/auth/login', { email: user.email, password: user.password })).status).toBe(200);
+
+      for (let i = 0; i < 4; i++) await post('/auth/login', { email: user.email, password: 'incorrecto-123' });
+
+      expect((await post('/auth/login', { email: user.email, password: user.password })).status).toBe(200);
+    });
+
+    it('no cuenta como intento fallido un login sin email o password', async () => {
+      const user = newUser('login-validacion');
+      await post('/auth/register', user);
+      for (let i = 0; i < 6; i++) await post('/auth/login', { email: user.email });
+
+      expect((await post('/auth/login', { email: user.email, password: user.password })).status).toBe(200);
+    });
   });
 });
 

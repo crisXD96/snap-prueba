@@ -77,23 +77,27 @@ export function TrendChart({ clicksByDay }: { clicksByDay: ClicksByDay }) {
         ))}
       </div>
 
-      <table className="visually-hidden">
-        <caption>Clicks por día</caption>
-        <thead>
-          <tr>
-            <th scope="col">Día</th>
-            <th scope="col">Clicks</th>
-          </tr>
-        </thead>
-        <tbody>
-          {clicksByDay.map(({ day, clicks }) => (
-            <tr key={day}>
-              <th scope="row">{formatDay(day)}</th>
-              <td>{formatNumber(clicks)}</td>
+      {/* Se oculta el contenedor y no la tabla: una tabla ignora height: 1px y sus filas
+          alargarían la página. */}
+      <div className="visually-hidden">
+        <table>
+          <caption>Clicks por día</caption>
+          <thead>
+            <tr>
+              <th scope="col">Día</th>
+              <th scope="col">Clicks</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {clicksByDay.map(({ day, clicks }) => (
+              <tr key={day}>
+                <th scope="row">{formatDay(day)}</th>
+                <td>{formatNumber(clicks)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

@@ -38,6 +38,16 @@ describe('gráfica de clicks por día', () => {
     expect(within(rows[3] as HTMLElement).getByRole('cell').textContent).toBe('1');
   });
 
+  // jsdom no calcula alturas: se comprueba la estructura que evita el problema. Una tabla ignora
+  // height: 1px, así que con la clase puesta en ella sus 90 filas alargaban la página en blanco.
+  it('oculta la tabla dentro de un contenedor, para que sus filas no alarguen la página', () => {
+    render(<TrendChart clicksByDay={days(90)} />);
+
+    const table = screen.getByRole('table', { name: 'Clicks por día' });
+    expect(table.classList.contains('visually-hidden')).toBe(false);
+    expect(table.parentElement?.classList.contains('visually-hidden')).toBe(true);
+  });
+
   it('con 7 días etiqueta cada día en el eje', () => {
     render(<TrendChart clicksByDay={days(7)} />);
 

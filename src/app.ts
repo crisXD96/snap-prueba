@@ -8,12 +8,16 @@ import { healthRouter } from './modules/health/health.routes.ts';
 import { createUrlsRouter } from './modules/urls/urls.routes.ts';
 import { createWebRouter } from './modules/web/web.routes.ts';
 import { errorHandler } from './shared/error.middleware.ts';
+import { securityHeaders } from './shared/security-headers.middleware.ts';
 
 // Separada de server.ts para que los tests levanten la app sin fijar un puerto.
 // La conexión y el secreto llegan desde fuera para que los tests usen los suyos.
 // Sin webDir no se sirve la SPA: los tests de la API no dependen del build.
 export function createApp(db: DatabaseSync, jwtSecret: string, webDir?: string): Express {
   const app = express();
+  app.disable('x-powered-by');
+  // Primero, para que también los lleven las respuestas de error y las redirecciones.
+  app.use(securityHeaders);
   app.use(express.json());
   app.use(healthRouter);
   app.use(createAuthRouter(db, jwtSecret));

@@ -33,7 +33,7 @@ Una ruta, un campo de respuesta o un código de error nuevo o modificado de la A
 - Fechas y números solo con `format.ts` (`es-MX`, hora `America/Mexico_City`). Los días del dashboard (`YYYY-MM-DD`) ya vienen en hora local y se formatean con `formatDay`.
 - Textos de la interfaz en español, con tuteo ("Inicia sesión", "Copiar enlace").
 - Accesibilidad: cada input con `<label>` asociado, botones con texto visible y secciones con nombre accesible (`aria-label` o encabezado). Los tests buscan por rol y por etiqueta, así que esto también los mantiene estables.
-- Gráficas: el dibujo lleva `aria-hidden="true"` y los datos van en una tabla con `className="visually-hidden"` y `<caption>`, más un resumen en texto visible (total y valor máximo). Así está `TrendChart`.
+- Gráficas: el dibujo lleva `aria-hidden="true"` y los datos van en una tabla con `<caption>` dentro de un `<div className="visually-hidden">`, más un resumen en texto visible (total y valor máximo). Así está `TrendChart`. La clase va en el `div`, nunca en la `<table>`: una tabla ignora `height: 1px` y sus filas alargan la página.
 
 ## Estilos
 

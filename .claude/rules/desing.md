@@ -33,10 +33,11 @@ Una ruta, un campo de respuesta o un código de error nuevo o modificado de la A
 - Fechas y números solo con `format.ts` (`es-MX`, hora `America/Mexico_City`). Los días del dashboard (`YYYY-MM-DD`) ya vienen en hora local y se formatean con `formatDay`.
 - Textos de la interfaz en español, con tuteo ("Inicia sesión", "Copiar enlace").
 - Accesibilidad: cada input con `<label>` asociado, botones con texto visible y secciones con nombre accesible (`aria-label` o encabezado). Los tests buscan por rol y por etiqueta, así que esto también los mantiene estables.
+- Gráficas: el dibujo lleva `aria-hidden="true"` y los datos van en una tabla con `className="visually-hidden"` y `<caption>`, más un resumen en texto visible (total y valor máximo). Así está `TrendChart`.
 
 ## Estilos
 
-- Todo en `src/web/styles.css`, con clases planas en kebab-case. Sin CSS-in-JS ni estilos inline salvo valores calculados (p. ej. la altura de una barra de la gráfica).
+- Todo en `src/web/styles.css`, con clases planas en kebab-case. Sin CSS-in-JS ni atributos `style`, ni siquiera para valores calculados: una CSP estricta los bloquea. Un tamaño calculado va como atributo SVG, como las barras de `TrendChart`.
 - Colores solo con las variables de `:root` (`--bg`, `--surface`, `--text`, `--muted`, `--border`, `--accent`, `--accent-text`, `--danger`, `--danger-text`, `--notice-bg`). Un color nuevo se define en `:root` y también en el bloque `prefers-color-scheme: dark`.
 - El texto sobre un fondo de color usa su variable pareja (`--accent-text` sobre `--accent`, `--danger-text` sobre `--danger`), nunca un color fijo. `src/web/__tests__/styles.test.ts` verifica el contraste AA (4.5:1) en los dos temas: una combinación nueva de texto y fondo se agrega a su lista `PAIRS`.
 - El foco de teclado lo marca la regla `:focus-visible`; no quitar el `outline` de ningún elemento.

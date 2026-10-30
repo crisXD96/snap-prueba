@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { removeUrl } from '../api.ts';
 import type { DashboardUrl } from '../api.ts';
 import { formatDateTime, formatNumber, shortUrl } from '../format.ts';
-import { useErrorMessage, useToken } from '../session.tsx';
+import { useErrorMessage } from '../session.tsx';
 import { CopyButton } from './CopyButton.tsx';
 import { Icon } from './Icon.tsx';
 
@@ -17,7 +17,6 @@ interface UrlListProps {
 }
 
 export function UrlList({ items, hasMore, loadingMore, highlightCode, onLoadMore, onRemoved }: UrlListProps) {
-  const token = useToken();
   const toMessage = useErrorMessage();
   // Borrar pide una segunda confirmación en la misma fila, sin diálogos del navegador.
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -28,7 +27,7 @@ export function UrlList({ items, hasMore, loadingMore, highlightCode, onLoadMore
     setRemoving(code);
     setError(null);
     try {
-      await removeUrl(token, code);
+      await removeUrl(code);
       setConfirming(null);
       onRemoved(code);
     } catch (caught) {

@@ -8,11 +8,19 @@ export function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8' } });
 }
 
+// Toda la app pregunta por la sesión al arrancar y la cierra en el servidor al salir: por defecto
+// no hay cookie de sesión. Un test que necesite otra cosa declara su propia ruta.
+const SESSION_ROUTES: Record<string, Handler> = {
+  'GET /auth/me': () => jsonResponse(401, { error: 'Token requerido' }),
+  'POST /auth/logout': () => new Response(null, { status: 204 }),
+};
+
 // La red es el único borde que se simula: cada clave es "MÉTODO ruta" tal como la pide la SPA.
 export function mockFetch(routes: Record<string, Handler>) {
+  const allRoutes = { ...SESSION_ROUTES, ...routes };
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const key = `${init?.method ?? 'GET'} ${String(input)}`;
-    const handler = routes[key];
+    const handler = allRoutes[key];
     if (!handler) {
       throw new Error(`Petición no esperada: ${key}`);
     }
@@ -22,17 +30,12 @@ export function mockFetch(routes: Record<string, Handler>) {
   return fetchMock;
 }
 
-function base64Url(value: unknown): string {
-  return btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-// La SPA solo lee exp; la firma la valida el backend.
-export function fakeToken(expiresInSeconds = 3600): string {
-  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  return `${base64Url({ alg: 'HS256', typ: 'JWT' })}.${base64Url({ sub: '1', email: 'ana@example.com', exp })}.firma`;
-}
-
 export const ana = { id: 1, email: 'ana@example.com', name: 'Ana', createdAt: '2026-10-01T12:00:00.000Z' };
+
+// Body del login, del registro o de /auth/me. El token real viaja en la cookie: la SPA nunca lo lee.
+export function authResult(expiresInSeconds = 3600) {
+  return { user: ana, token: 'token-que-la-spa-ignora', expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString() };
+}
 
 export function urlItem(code: string, overrides: Partial<DashboardUrl> = {}): DashboardUrl {
   return {

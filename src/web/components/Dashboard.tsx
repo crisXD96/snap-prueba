@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDashboard, getDashboardUrls } from '../api.ts';
 import type { DashboardOverview, DashboardUrl, Days, ShortUrl } from '../api.ts';
-import { useErrorMessage, useToken } from '../session.tsx';
+import { useErrorMessage } from '../session.tsx';
 import { Icon } from './Icon.tsx';
 import { Metrics } from './Metrics.tsx';
 import { ShortenForm } from './ShortenForm.tsx';
@@ -12,7 +12,6 @@ const PERIODS: Days[] = [7, 30, 90];
 export const METRICS_REFRESH_MS = 30_000;
 
 export function Dashboard() {
-  const token = useToken();
   const toMessage = useErrorMessage();
   const [days, setDays] = useState<Days>(7);
   // Cambiarla vuelve a pedir métricas y primera página, p. ej. tras crear o borrar una URL.
@@ -37,7 +36,7 @@ export function Dashboard() {
     let ignore = false;
     setMetricsError(null);
     setLoadingMetrics(true);
-    getDashboard(token, days)
+    getDashboard(days)
       .then(
         (result) => {
           if (!ignore) setOverview(result);
@@ -52,7 +51,7 @@ export function Dashboard() {
     return () => {
       ignore = true;
     };
-  }, [token, days, version, metricsTick, toMessage]);
+  }, [days, version, metricsTick, toMessage]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -67,7 +66,7 @@ export function Dashboard() {
     listGeneration.current += 1;
     setListError(null);
     setLoadingList(true);
-    getDashboardUrls(token)
+    getDashboardUrls()
       .then(
         (page) => {
           if (ignore) return;
@@ -84,7 +83,7 @@ export function Dashboard() {
     return () => {
       ignore = true;
     };
-  }, [token, version, toMessage]);
+  }, [version, toMessage]);
 
   const reload = () => setVersion((v) => v + 1);
 
@@ -103,7 +102,7 @@ export function Dashboard() {
     const generation = listGeneration.current;
     setLoadingMore(true);
     try {
-      const page = await getDashboardUrls(token, nextCursor);
+      const page = await getDashboardUrls(nextCursor);
       if (generation !== listGeneration.current) return;
       setItems((current) => [...(current ?? []), ...page.items]);
       setNextCursor(page.nextCursor);

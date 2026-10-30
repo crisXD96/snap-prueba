@@ -7,11 +7,11 @@ import { useSession } from './session.tsx';
 
 // Sin rutas en la URL: la vista depende de la sesión, así no choca con /:code ni con /dashboard.
 export function App() {
-  const { session, notice, signOut } = useSession();
+  const { session, checking, notice, signOut } = useSession();
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
   return (
-    <div className={session ? 'app' : 'app app-auth'}>
+    <div className="app">
       <header className="app-header">
         <span className="brand">
           <span className="brand-mark">
@@ -34,7 +34,12 @@ export function App() {
       </header>
 
       <main>
-        {session ? (
+        {checking ? (
+          <p className="checking muted">
+            <Icon name="refresh-cw" className="spin" />
+            Comprobando tu sesión…
+          </p>
+        ) : session ? (
           <Dashboard />
         ) : (
           <div className="auth-layout">

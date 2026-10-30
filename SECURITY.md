@@ -29,7 +29,8 @@ Una vez corregida, el reporte se documenta en el commit del arreglo.
 - El login devuelve el mismo error para un email inexistente y para un password incorrecto, para no revelar qué cuentas existen.
 - Los JWT se firman con HS256, duran 24 h, y la verificación fija el algoritmo para que el token no pueda elegirlo.
 - El login admite 5 passwords incorrectos por IP y email cada 15 minutos; después responde `429` con `Retry-After`. Un login correcto reinicia el conteo.
-- En la interfaz web el token vive **solo en memoria**: nunca se guarda en `localStorage`, `sessionStorage` ni cookies.
+- En la interfaz web el token viaja solo en la cookie `snap_session` (`HttpOnly`, `Secure`, `SameSite=Strict`, 24 h): el JavaScript de la página no puede leerlo, así que un XSS no puede robarlo. Nunca se guarda en `localStorage`, `sessionStorage` ni IndexedDB.
+- Contra CSRF, además de `SameSite=Strict`: una petición con efectos (`POST`, `DELETE`) autenticada por cookie, y el login, el registro y el cierre de sesión, se rechazan con `403` si su `Origin` no es el de la propia app. Con el header `Authorization` no hace falta, porque un sitio ajeno no puede ponerlo.
 
 ### Headers HTTP
 

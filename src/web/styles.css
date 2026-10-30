@@ -289,6 +289,17 @@ h2.with-icon .icon {
   box-shadow: var(--shadow);
 }
 
+/* ---------- Comprobando la sesión al cargar ---------- */
+
+.checking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 50vh;
+  animation: fade-up 0.3s var(--ease-out) both;
+}
+
 /* ---------- Login y registro ---------- */
 
 .auth-layout {

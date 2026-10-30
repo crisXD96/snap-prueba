@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { shorten } from '../api.ts';
 import type { ShortUrl } from '../api.ts';
 import { shortUrl } from '../format.ts';
-import { useErrorMessage, useToken } from '../session.tsx';
+import { useErrorMessage } from '../session.tsx';
 import { CopyButton } from './CopyButton.tsx';
 import { Icon } from './Icon.tsx';
 
@@ -14,7 +14,6 @@ interface ShortenFormProps {
 }
 
 export function ShortenForm({ created, onCreatedChange }: ShortenFormProps) {
-  const token = useToken();
   const toMessage = useErrorMessage();
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +25,7 @@ export function ShortenForm({ created, onCreatedChange }: ShortenFormProps) {
     setError(null);
     onCreatedChange(null);
     try {
-      onCreatedChange(await shorten(token, url));
+      onCreatedChange(await shorten(url));
       setUrl('');
     } catch (caught) {
       setError(toMessage(caught));

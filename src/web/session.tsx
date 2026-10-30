@@ -1,49 +1,65 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ApiError, UNEXPECTED_ERROR } from './api.ts';
-import type { AuthResult, User } from './api.ts';
+import { ApiError, getSession, logout, UNEXPECTED_ERROR } from './api.ts';
+import type { SessionInfo, User } from './api.ts';
 
 export const SESSION_EXPIRED = 'Tu sesión ha expirado. Por favor, inicia sesión de nuevo.';
 
-// El token vive solo en memoria: las reglas del equipo prohíben guardarlo en storage del navegador.
+// El token vive en una cookie HttpOnly que el JavaScript no puede leer: aquí solo están el
+// usuario y cuándo vence, que manda el servidor.
 interface Session {
-  token: string;
   user: User;
   expiresAt: number;
 }
 
 interface SessionContextValue {
   session: Session | null;
+  // Mientras se pregunta al servidor si la cookie sigue valiendo, p. ej. al recargar la página.
+  checking: boolean;
   // Aviso para la pantalla de login, p. ej. por qué se cerró la sesión.
   notice: string | null;
-  signIn(result: AuthResult): void;
+  signIn(info: SessionInfo): void;
   signOut(notice?: string): void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-// Lee exp del JWT sin verificarlo: solo sirve para cerrar la sesión a tiempo; quien valida es el backend.
-function tokenExpiresAt(token: string): number {
-  try {
-    const payload = token.split('.')[1] ?? '';
-    const { exp } = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: unknown };
-    if (typeof exp === 'number') return exp * 1000;
-  } catch {
-    // Sin exp legible la sesión dura hasta que el backend responda 401.
-  }
-  return Number.POSITIVE_INFINITY;
+function toSession({ user, expiresAt }: SessionInfo): Session {
+  // Sin una fecha legible la sesión dura hasta que el backend responda 401.
+  return { user, expiresAt: Date.parse(expiresAt) };
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [checking, setChecking] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const signIn = useCallback(({ token, user }: AuthResult) => {
-    setSession({ token, user, expiresAt: tokenExpiresAt(token) });
+  useEffect(() => {
+    let ignore = false;
+    getSession()
+      .then(
+        (info) => {
+          if (!ignore) setSession(toSession(info));
+        },
+        // Sin cookie o con una vencida el servidor responde 401: se muestra el login.
+        () => {},
+      )
+      .finally(() => {
+        if (!ignore) setChecking(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const signIn = useCallback((info: SessionInfo) => {
+    setSession(toSession(info));
     setNotice(null);
   }, []);
 
   const signOut = useCallback((nextNotice?: string) => {
+    // Borra la cookie en el servidor; si falla, la cookie vence sola y el panel ya no se muestra.
+    logout().catch(() => {});
     setSession(null);
     setNotice(nextNotice ?? null);
   }, []);
@@ -54,7 +70,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [session, signOut]);
 
-  const value = useMemo(() => ({ session, notice, signIn, signOut }), [session, notice, signIn, signOut]);
+  const value = useMemo(
+    () => ({ session, checking, notice, signIn, signOut }),
+    [session, checking, notice, signIn, signOut],
+  );
   return <SessionContext value={value}>{children}</SessionContext>;
 }
 
@@ -64,15 +83,6 @@ export function useSession(): SessionContextValue {
     throw new Error('useSession requiere un SessionProvider');
   }
   return value;
-}
-
-// Para las vistas con sesión: devuelve el token (siempre existe dentro del panel).
-export function useToken(): string {
-  const { session } = useSession();
-  if (!session) {
-    throw new Error('useToken solo se usa con una sesión iniciada');
-  }
-  return session.token;
 }
 
 // Traduce un error de la API al mensaje a mostrar. Un 401 cierra la sesión y devuelve null.

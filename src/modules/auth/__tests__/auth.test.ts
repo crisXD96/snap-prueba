@@ -247,6 +247,117 @@ describe('API de autenticación', () => {
       expect((await post('/auth/login', { email: user.email, password: user.password })).status).toBe(200);
     });
   });
+
+  describe('sesión en cookie', () => {
+    // El valor de Set-Cookie de la sesión, o undefined si la respuesta no la trae.
+    function sessionCookie(res: Response): string | undefined {
+      return res.headers.getSetCookie().find((cookie) => cookie.startsWith('snap_session='));
+    }
+
+    function cookieHeader(setCookie: string | undefined): string {
+      return setCookie?.split(';')[0] ?? '';
+    }
+
+    async function loginAs(alias: string): Promise<Response> {
+      const user = newUser(alias);
+      await post('/auth/register', user);
+      return post('/auth/login', { email: user.email, password: user.password });
+    }
+
+    it.each(['/auth/login', '/auth/register'])(
+      'POST %s deja la sesión en una cookie HttpOnly, Secure y SameSite=Strict que dura 24 horas',
+      async (path) => {
+        const user = newUser(`cookie-${path.split('/').pop()}`);
+        if (path === '/auth/login') await post('/auth/register', user);
+
+        const res = await post(path, path === '/auth/login' ? { email: user.email, password: user.password } : user);
+
+        const cookie = sessionCookie(res) ?? '';
+        expect(cookie).toMatch(/HttpOnly/i);
+        expect(cookie).toMatch(/Secure/i);
+        expect(cookie).toMatch(/SameSite=Strict/i);
+        expect(cookie).toMatch(/Path=\//);
+        expect(Number(/Max-Age=(\d+)/i.exec(cookie)?.[1])).toBeGreaterThan(24 * 60 * 60 - 10);
+      },
+    );
+
+    it('el login devuelve en el body cuándo expira la sesión', async () => {
+      const res = await loginAs('expira');
+
+      const { expiresAt, token } = (await res.json()) as { expiresAt: string; token: string };
+      expect(Date.parse(expiresAt)).toBe((decode(token).exp ?? 0) * 1000);
+    });
+
+    it('rechaza con 403 un login que viene de otro origen y no deja cookie', async () => {
+      const user = newUser('login-ajeno');
+      await post('/auth/register', user);
+
+      const res = await fetch(`${baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'https://sitio-malicioso.example' },
+        body: JSON.stringify({ email: user.email, password: user.password }),
+      });
+
+      expect(res.status).toBe(403);
+      expect(sessionCookie(res)).toBeUndefined();
+    });
+
+    it('un login fallido no deja cookie de sesión', async () => {
+      const user = newUser('sin-cookie');
+      await post('/auth/register', user);
+
+      const res = await post('/auth/login', { email: user.email, password: 'incorrecto-123' });
+
+      expect(sessionCookie(res)).toBeUndefined();
+    });
+
+    it('GET /auth/me con la cookie responde 200 con el usuario y la expiración, sin el hash', async () => {
+      const login = await loginAs('me-ok');
+      const { expiresAt } = (await login.json()) as { expiresAt: string };
+
+      const res = await fetch(`${baseUrl}/auth/me`, { headers: { cookie: cookieHeader(sessionCookie(login)) } });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        user: { id: expect.any(Number), email: 'me-ok@example.com', name: 'me-ok', createdAt: expect.any(String) },
+        expiresAt,
+      });
+    });
+
+    it('GET /auth/me sin cookie responde 401', async () => {
+      const res = await fetch(`${baseUrl}/auth/me`);
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: 'Token requerido' });
+    });
+
+    it('GET /auth/me con una cookie que no firmó el servidor responde 401', async () => {
+      const res = await fetch(`${baseUrl}/auth/me`, { headers: { cookie: 'snap_session=esto.no-es.un-jwt' } });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('POST /auth/logout responde 204 y borra la cookie de sesión', async () => {
+      const res = await fetch(`${baseUrl}/auth/logout`, { method: 'POST' });
+
+      expect(res.status).toBe(204);
+      const cookie = sessionCookie(res) ?? '';
+      expect(cookie).toMatch(/^snap_session=;/);
+      expect(cookie).toMatch(/Expires=Thu, 01 Jan 1970/);
+    });
+
+    it('con la cookie se puede usar la API protegida sin header Authorization', async () => {
+      const login = await loginAs('cookie-api');
+
+      const res = await fetch(`${baseUrl}/urls`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie: cookieHeader(sessionCookie(login)), origin: baseUrl },
+        body: JSON.stringify({ url: 'https://example.com/con-cookie' }),
+      });
+
+      expect(res.status).toBe(201);
+    });
+  });
 });
 
 describe('middleware de autenticación', () => {
@@ -265,6 +376,9 @@ describe('middleware de autenticación', () => {
     const app = express();
     app.get('/protegida', createAuthMiddleware(jwtSecret), (req, res) => {
       res.status(200).json({ user: req.user });
+    });
+    app.post('/protegida', createAuthMiddleware(jwtSecret), (_req, res) => {
+      res.status(204).end();
     });
     server = app.listen(0, '127.0.0.1');
     await once(server, 'listening');
@@ -293,7 +407,9 @@ describe('middleware de autenticación', () => {
     const res = await getProtected(`Bearer ${validToken}`);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ user: { id: userId, email: 'ana@example.com' } });
+    expect(await res.json()).toEqual({
+      user: { id: userId, email: 'ana@example.com', expiresAt: new Date((decode(validToken).exp ?? 0) * 1000).toISOString() },
+    });
   });
 
   it('responde 401 cuando no hay header Authorization', async () => {
@@ -332,5 +448,38 @@ describe('middleware de autenticación', () => {
     const withoutSubject = jwt.sign({ email: 'ana@example.com' }, jwtSecret, { algorithm: 'HS256', expiresIn: '1h' });
 
     await expectUnauthorized(await getProtected(`Bearer ${withoutSubject}`), 'Token inválido o expirado');
+  });
+
+  describe('con la sesión en cookie', () => {
+    function postProtected(headers: Record<string, string>): Promise<Response> {
+      return fetch(`${baseUrl}/protegida`, { method: 'POST', headers });
+    }
+
+    it('acepta el token desde la cookie de sesión', async () => {
+      const res = await fetch(`${baseUrl}/protegida`, { headers: { cookie: `otra=1; snap_session=${validToken}` } });
+
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { user: { id: number } }).user.id).toBe(userId);
+    });
+
+    it('acepta un POST con cookie que viene del mismo origen', async () => {
+      const res = await postProtected({ cookie: `snap_session=${validToken}`, origin: baseUrl });
+
+      expect(res.status).toBe(204);
+    });
+
+    it('rechaza con 403 un POST con cookie que viene de otro origen', async () => {
+      const res = await postProtected({ cookie: `snap_session=${validToken}`, origin: 'https://sitio-malicioso.example' });
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'Origen no permitido' });
+    });
+
+    // Un sitio ajeno no puede poner el header Authorization: sin cookie no hay riesgo de CSRF.
+    it('acepta un POST con Bearer aunque venga de otro origen', async () => {
+      const res = await postProtected({ authorization: `Bearer ${validToken}`, origin: 'https://otra-app.example' });
+
+      expect(res.status).toBe(204);
+    });
   });
 });

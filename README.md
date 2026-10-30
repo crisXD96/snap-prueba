@@ -75,11 +75,15 @@ La vista depende de la sesión, no de la URL: en `/` se muestra el panel si hay 
 
 ### Sesión
 
-El token JWT vive **solo en memoria**: por las reglas de seguridad del equipo no se guarda en `localStorage`, `sessionStorage` ni cookies. Por eso:
+El token JWT viaja en la cookie `snap_session`, que es `HttpOnly` (el JavaScript de la página no puede leerla), `Secure` y `SameSite=Strict`. La SPA nunca toca el token ni lo guarda en `localStorage` o `sessionStorage`. Por eso:
 
-- Recargar la página cierra la sesión.
+- **Recargar la página mantiene la sesión**: al cargar, la SPA pregunta a `GET /auth/me` y, si la cookie sigue vigente, entra directo al panel.
+- La sesión es la misma en todas las pestañas: **Cerrar sesión** (`POST /auth/logout`) la cierra en todas.
 - Si el token expira (24 h) o el backend responde `401`, la app vuelve al login con el aviso *"Tu sesión ha expirado. Por favor, inicia sesión de nuevo."*
 - Un `403` no cierra la sesión: en esta API significa que la URL pertenece a otro usuario.
+- `Secure` exige HTTPS. Los navegadores lo aceptan en `http://localhost`, pero en cualquier otro host sin HTTPS la cookie no se guarda y la sesión no funciona.
+
+Los clientes que no son la SPA pueden seguir usando el `token` del body del login con `Authorization: Bearer`.
 
 ### Estructura
 
@@ -95,7 +99,7 @@ src/
     ├── main.tsx
     ├── App.tsx               # login/registro o panel según la sesión
     ├── api.ts                # cliente de la API: Bearer, errores { error }, respuestas no JSON
-    ├── session.tsx           # sesión en memoria, expiración y manejo del 401
+    ├── session.tsx           # sesión de la cookie (/auth/me), expiración y manejo del 401
     ├── format.ts             # fechas en hora del centro de México, porcentajes, URL corta
     ├── styles.css            # tema claro y oscuro, diseño adaptable
     ├── vite.config.ts        # proxy de desarrollo y salida a dist/web

@@ -27,6 +27,7 @@ export interface UsersRepository {
   // Devuelve undefined si el email ya existe, para que quien llama decida el error.
   insert(user: NewUser): UserRecord | undefined;
   findByEmail(email: string): UserRecord | undefined;
+  findById(id: number): UserRecord | undefined;
 }
 
 function toRecord(row: UserRow): UserRecord {
@@ -47,6 +48,7 @@ export function createUsersRepository(db: DatabaseSync): UsersRepository {
      RETURNING id, email, password_hash, name, created_at`,
   );
   const findByEmail = lazyStatement(db, 'SELECT id, email, password_hash, name, created_at FROM users WHERE email = ?');
+  const findById = lazyStatement(db, 'SELECT id, email, password_hash, name, created_at FROM users WHERE id = ?');
 
   return {
     insert({ email, passwordHash, name }) {
@@ -56,6 +58,11 @@ export function createUsersRepository(db: DatabaseSync): UsersRepository {
 
     findByEmail(email) {
       const row = findByEmail().get(email) as UserRow | undefined;
+      return row ? toRecord(row) : undefined;
+    },
+
+    findById(id) {
+      const row = findById().get(id) as UserRow | undefined;
       return row ? toRecord(row) : undefined;
     },
   };

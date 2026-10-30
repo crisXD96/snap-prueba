@@ -272,29 +272,23 @@ button.danger {
   font-weight: 700;
 }
 
-.bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 140px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.trend {
+  /* Contiene la tabla oculta de la gráfica: sin esto estira la página a lo ancho. */
+  position: relative;
 }
 
-.bars li {
-  flex: 1;
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
+.trend p {
+  margin-bottom: 12px;
+}
+
+.bars {
+  display: block;
+  width: 100%;
+  height: 140px;
 }
 
 .bar {
-  display: block;
-  width: 100%;
-  min-height: 2px;
-  background: var(--accent);
-  border-radius: 3px 3px 0 0;
+  fill: var(--accent);
 }
 
 .bars-axis {
@@ -303,6 +297,14 @@ button.danger {
   color: var(--muted);
   font-size: 0.8rem;
   margin-top: 6px;
+}
+
+/* Una fecha por barra: columnas iguales para que cada una quede centrada bajo su día. */
+.bars-axis.every-day {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  text-align: center;
 }
 
 .table-wrap {

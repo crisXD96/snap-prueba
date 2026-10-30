@@ -62,7 +62,7 @@ Abre `http://localhost:3000` (o el `PORT` configurado).
 - **Panel**:
   - Formulario para acortar una URL, con el enlace corto listo para copiar.
   - Métricas del periodo (7, 30 o 90 días): clicks del periodo y variación contra el anterior, clicks totales y URLs sin clicks.
-  - Gráfica de clicks por día y botón **Actualizar métricas** para ver clicks nuevos sin recargar.
+  - Gráfica de clicks por día con un resumen del periodo (total y día con más clicks) y botón **Actualizar métricas** para ver clicks nuevos sin recargar. Con lector de pantalla, la gráfica se lee como una tabla de clicks por día.
   - Lista paginada de tus URLs con clicks, fechas, **Copiar enlace** y borrado con confirmación. En celular y tablet vertical cada URL se muestra como tarjeta.
 
 La vista depende de la sesión, no de la URL: en `/` se muestra el panel si hay sesión y el login si no.

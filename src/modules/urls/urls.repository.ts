@@ -19,7 +19,6 @@ export interface UrlsRepository {
   // Devuelve undefined si el código ya existe, para que quien llama elija otro.
   insert(code: string, url: string, userId: number): UrlRecord | undefined;
   findByCode(code: string): UrlRecord | undefined;
-  findAll(): UrlRecord[];
   delete(code: string): void;
 }
 
@@ -47,13 +46,6 @@ export function createUrlsRepository(db: DatabaseSync): UrlsRepository {
         .prepare('SELECT code, original_url, user_id, created_at FROM urls WHERE code = ?')
         .get(code) as UrlRow | undefined;
       return row ? toRecord(row) : undefined;
-    },
-
-    findAll() {
-      const rows = db
-        .prepare('SELECT code, original_url, user_id, created_at FROM urls ORDER BY created_at DESC, rowid DESC')
-        .all() as unknown as UrlRow[];
-      return rows.map(toRecord);
     },
 
     delete(code) {

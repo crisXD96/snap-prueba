@@ -93,8 +93,10 @@ describe('API de urls', () => {
       const res = await shorten({ url: 'https://example.com/sin-token' }, null);
 
       expect(res.status).toBe(401);
-      const list = (await (await fetch(`${baseUrl}/urls`)).json()) as { url: string }[];
-      expect(list.map((item) => item.url)).not.toContain('https://example.com/sin-token');
+      const saved = db
+        .prepare('SELECT COUNT(*) AS total FROM urls WHERE original_url = ?')
+        .get('https://example.com/sin-token') as { total: number };
+      expect(saved.total).toBe(0);
     });
 
     it('rechaza con 400 una url que no es http ni https', async () => {
@@ -167,17 +169,13 @@ describe('API de urls', () => {
       expect(await res.json()).toEqual({ error: 'Código no encontrado' });
     });
 
-    it('lista sin pedir token las urls de todos, de la más reciente a la más antigua y sin exponer al dueño', async () => {
-      const primera = await createShortUrl('https://example.com/primera', anaToken);
-      const segunda = await createShortUrl('https://example.com/segunda', beaToken);
+    it('responde 404 en GET /urls: no hay un listado público de las urls', async () => {
+      await createShortUrl('https://example.com/privada', anaToken);
 
       const res = await fetch(`${baseUrl}/urls`);
 
-      expect(res.status).toBe(200);
-      const list = (await res.json()) as { code: string; url: string; createdAt: string }[];
-      const codes = list.map((item) => item.code);
-      expect(codes.indexOf(segunda.code)).toBeLessThan(codes.indexOf(primera.code));
-      expect(list).toContainEqual({ code: primera.code, url: 'https://example.com/primera', createdAt: expect.any(String) });
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain('https://example.com/privada');
     });
 
     it('no captura /health con la ruta de códigos', async () => {

@@ -30,7 +30,6 @@ export interface UrlsService {
   shorten(rawUrl: unknown, userId: number): UrlRecord;
   // Registra el click solo si el código existe.
   resolve(code: string, visit: Visit): string | undefined;
-  list(): UrlRecord[];
   remove(code: string, userId: number): void;
 }
 
@@ -106,10 +105,6 @@ export function createUrlsService(
         console.error('No se pudo registrar el click', error);
       }
       return record.url;
-    },
-
-    list() {
-      return repository.findAll();
     },
 
     remove(code, userId) {

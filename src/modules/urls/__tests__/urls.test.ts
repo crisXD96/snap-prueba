@@ -1,30 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../../app.ts';
+import { createTestDatabase, SCHEMA_SCRIPTS } from '../../../shared/__tests__/test-database.ts';
 import { createUsersRepository } from '../../auth/auth.repository.ts';
 import { createClicksRepository } from '../../clicks/clicks.repository.ts';
 import { createUrlsRepository } from '../urls.repository.ts';
 import { CodeGenerationError, createUrlsService, NotUrlOwnerError, UrlNotFoundError } from '../urls.service.ts';
-
-// Se aplican en orden los mismos scripts que revisa el DBA, para probar contra el esquema real.
-const SCHEMA_SCRIPTS = ['001_create_urls.sql', '002_create_users.sql', '003_add_user_to_urls.sql', '004_create_clicks.sql'];
-
-function readScripts(files: string[]): string {
-  return files.map((file) => readFileSync(new URL(`../../../../db-scripts/${file}`, import.meta.url), 'utf8')).join('\n');
-}
-
-const schema = readScripts(SCHEMA_SCRIPTS);
-
-function createTestDatabase(script: string = schema): DatabaseSync {
-  const db = new DatabaseSync(':memory:');
-  db.exec(script);
-  return db;
-}
 
 interface ClickRow {
   referrer: string | null;
@@ -354,7 +339,7 @@ describe('servicio de urls', () => {
 
   it('redirige aunque no se pueda registrar el click', () => {
     // Sin el script de clicks el INSERT falla, como cuando la base está bloqueada.
-    const db = createTestDatabase(readScripts(SCHEMA_SCRIPTS.slice(0, 3)));
+    const db = createTestDatabase(SCHEMA_SCRIPTS.filter((file) => file < '004_create_clicks.sql'));
     db.prepare("INSERT INTO urls (code, original_url) VALUES ('sinclik', 'https://example.com/sin-clicks')").run();
     const service = createUrlsService(createUrlsRepository(db), createClicksRepository(db));
     const logError = vi.spyOn(console, 'error').mockImplementation(() => {});

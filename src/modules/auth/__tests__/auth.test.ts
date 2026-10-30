@@ -1,34 +1,24 @@
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { DatabaseSync } from 'node:sqlite';
 import bcrypt from 'bcryptjs';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import type { JwtPayload } from 'jsonwebtoken';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../../app.ts';
+import { createTestDatabase } from '../../../shared/__tests__/test-database.ts';
 import { createAuthMiddleware } from '../auth.middleware.ts';
 import { createUsersRepository } from '../auth.repository.ts';
 import type { UsersRepository } from '../auth.repository.ts';
 import { createAuthService, EmailAlreadyRegisteredError, InvalidCredentialsError } from '../auth.service.ts';
 import type { AuthService } from '../auth.service.ts';
 
-// Se aplica el mismo script que revisa el DBA, para probar contra el esquema real.
-const schema = readFileSync(new URL('../../../../db-scripts/002_create_users.sql', import.meta.url), 'utf8');
-
 // Secreto aleatorio por ejecución: los tests no dependen de ninguna clave real.
 const jwtSecret = randomBytes(32).toString('hex');
 
 const ana = { email: 'ana@example.com', password: 'contraseña-segura-123', name: 'Ana' };
-
-function createTestDatabase(): DatabaseSync {
-  const db = new DatabaseSync(':memory:');
-  db.exec(schema);
-  return db;
-}
 
 function decode(token: string): JwtPayload {
   return jwt.verify(token, jwtSecret, { algorithms: ['HS256'] }) as JwtPayload;

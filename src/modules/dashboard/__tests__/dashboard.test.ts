@@ -1,33 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../../app.ts';
+import { createTestDatabase } from '../../../shared/__tests__/test-database.ts';
 import { createUsersRepository } from '../../auth/auth.repository.ts';
 import { createDashboardRepository } from '../dashboard.repository.ts';
 import { createDashboardService } from '../dashboard.service.ts';
 import type { DashboardOverview } from '../dashboard.service.ts';
-
-// Se aplican en orden los mismos scripts que revisa el DBA, para probar contra el esquema real.
-const SCHEMA_SCRIPTS = [
-  '001_create_urls.sql',
-  '002_create_users.sql',
-  '003_add_user_to_urls.sql',
-  '004_create_clicks.sql',
-  '005_index_urls_user_id_created_at.sql',
-];
-const schema = SCHEMA_SCRIPTS.map((file) =>
-  readFileSync(new URL(`../../../../db-scripts/${file}`, import.meta.url), 'utf8'),
-).join('\n');
-
-function createTestDatabase(): DatabaseSync {
-  const db = new DatabaseSync(':memory:');
-  db.exec(schema);
-  return db;
-}
 
 describe('GET /dashboard', () => {
   let server: Server;

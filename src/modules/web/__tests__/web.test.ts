@@ -5,19 +5,9 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../../app.ts';
-
-const SCHEMA_SCRIPTS = ['001_create_urls.sql', '002_create_users.sql', '003_add_user_to_urls.sql', '004_create_clicks.sql'];
-
-function createTestDatabase(): DatabaseSync {
-  const db = new DatabaseSync(':memory:');
-  for (const file of SCHEMA_SCRIPTS) {
-    db.exec(readFileSync(new URL(`../../../../db-scripts/${file}`, import.meta.url), 'utf8'));
-  }
-  return db;
-}
+import { createTestDatabase } from '../../../shared/__tests__/test-database.ts';
 
 async function listen(webDir?: string): Promise<{ server: Server; baseUrl: string }> {
   const server = createApp(createTestDatabase(), randomBytes(32).toString('hex'), webDir).listen(0, '127.0.0.1');

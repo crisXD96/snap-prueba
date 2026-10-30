@@ -51,4 +51,3 @@ Una vez corregida, el reporte se documenta en el commit del arreglo.
 - El límite de intentos de login vive en la memoria del proceso: se reinicia con el servidor y no se comparte entre instancias.
 - Detrás de un proxy o balanceador, el límite ve la IP del proxy hasta que se configure `trust proxy` (ver el README).
 - No se envía `Strict-Transport-Security`: depende de que el despliegue sirva HTTPS.
-- `npm audit` reporta vulnerabilidades en `tinypool` (2 críticas) y `@vitest/mocker` (1 moderada), que llegan por `vitest`. Son dependencias de desarrollo que no llegan a producción: `npm audit --omit=dev` no encuentra ninguna. Corregirlas exige actualizar a Vitest 5.

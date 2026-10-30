@@ -14,6 +14,7 @@ Estas reglas complementan `SECURITY.md`. Si un cambio afecta alguna de las prác
 - El login responde el mismo `401` y el mismo mensaje para un email inexistente y un password incorrecto.
 - Los JWT se firman con HS256 y duran 24 h; `jwt.verify` siempre recibe `algorithms: ['HS256']`. El payload lleva `sub` (id del usuario) y `email`; el middleware valida los dos aunque la firma sea correcta.
 - Una ruta que lee o modifica datos de un usuario usa `requireAuth` y toma el id de `getAuthUser(req)`, nunca del body ni de la query.
+- No hay listados públicos ni globales: una ruta que lista recursos devuelve solo los del usuario del token. El listado de URLs es `GET /dashboard`; no volver a agregar `GET /urls`.
 - Antes de modificar o borrar un recurso, el service verifica que sea del usuario: `404` si no existe y `403` si es de otro.
 
 ## Datos y entradas
@@ -34,4 +35,5 @@ Estas reglas complementan `SECURITY.md`. Si un cambio afecta alguna de las prác
 ## Dependencias
 
 - No instalar dependencias. Proponer el cambio a `package.json` con el motivo para que lo revise el equipo.
-- Las vulnerabilidades conocidas de `vitest` y `tinypool` son solo de desarrollo y están documentadas en `SECURITY.md`. Una vulnerabilidad en una dependencia de producción se reporta al usuario.
+- Las vulnerabilidades conocidas de `vitest` y `tinypool` son solo de desarrollo y están documentadas en `SECURITY.md`. Ante una alerta nueva, `npm audit --omit=dev` dice si toca producción; si la toca, se reporta al usuario antes de seguir con otra tarea.
+- Las actualizaciones de Dependabot que cambian de versión mayor se validan con `npm run verify` sobre la rama del PR antes de aceptarlas.

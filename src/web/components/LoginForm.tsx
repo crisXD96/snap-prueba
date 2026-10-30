@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiError, login } from '../api.ts';
+import { ApiError, login, UNEXPECTED_ERROR } from '../api.ts';
 import { useSession } from '../session.tsx';
 
 export function LoginForm() {
@@ -18,7 +18,7 @@ export function LoginForm() {
       signIn(await login(email, password));
     } catch (caught) {
       // Aquí un 401 son credenciales incorrectas, no una sesión expirada.
-      setError(caught instanceof ApiError ? caught.message : 'Ocurrió un error inesperado. Intenta de nuevo.');
+      setError(caught instanceof ApiError ? caught.message : UNEXPECTED_ERROR);
       setSubmitting(false);
     }
   }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiError, register } from '../api.ts';
+import { ApiError, register, UNEXPECTED_ERROR } from '../api.ts';
 import { useSession } from '../session.tsx';
 
 // Debe coincidir con la regla del backend; el backend sigue siendo quien valida.
@@ -21,7 +21,7 @@ export function RegisterForm() {
     try {
       signIn(await register({ name, email, password }));
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Ocurrió un error inesperado. Intenta de nuevo.');
+      setError(caught instanceof ApiError ? caught.message : UNEXPECTED_ERROR);
       setSubmitting(false);
     }
   }

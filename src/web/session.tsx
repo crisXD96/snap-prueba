@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ApiError } from './api.ts';
+import { ApiError, UNEXPECTED_ERROR } from './api.ts';
 import type { AuthResult, User } from './api.ts';
 
 export const SESSION_EXPIRED = 'Tu sesión ha expirado. Por favor, inicia sesión de nuevo.';
@@ -85,7 +85,7 @@ export function useErrorMessage(): (error: unknown) => string | null {
         signOut(SESSION_EXPIRED);
         return null;
       }
-      return error instanceof ApiError ? error.message : 'Ocurrió un error inesperado. Intenta de nuevo.';
+      return error instanceof ApiError ? error.message : UNEXPECTED_ERROR;
     },
     [signOut],
   );

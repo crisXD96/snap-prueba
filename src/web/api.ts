@@ -49,7 +49,7 @@ export interface DashboardOverview {
   urls: { items: DashboardUrl[]; nextCursor: string | null };
 }
 
-const UNEXPECTED_ERROR = 'Ocurrió un error inesperado. Intenta de nuevo.';
+export const UNEXPECTED_ERROR = 'Ocurrió un error inesperado. Intenta de nuevo.';
 const NETWORK_ERROR = 'No se pudo conectar con el servidor.';
 
 interface RequestOptions {

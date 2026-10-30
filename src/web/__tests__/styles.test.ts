@@ -20,6 +20,12 @@ const PAIRS = [
   ['danger', 'bg'],
   ['danger', 'surface'],
   ['danger-text', 'danger'],
+  ['danger', 'danger-soft'],
+  ['text', 'surface-2'],
+  ['accent-text', 'accent-2'],
+  ['accent', 'accent-soft'],
+  ['success', 'surface'],
+  ['text', 'success-soft'],
 ] as const;
 
 function colorTokens(block: string): Record<string, string> {

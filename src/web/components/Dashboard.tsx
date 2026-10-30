@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { getDashboard, getDashboardUrls } from '../api.ts';
 import type { DashboardOverview, DashboardUrl, Days, ShortUrl } from '../api.ts';
 import { useErrorMessage, useToken } from '../session.tsx';
+import { Icon } from './Icon.tsx';
 import { Metrics } from './Metrics.tsx';
 import { ShortenForm } from './ShortenForm.tsx';
 import { TrendChart } from './TrendChart.tsx';
 import { UrlList } from './UrlList.tsx';
 
 const PERIODS: Days[] = [7, 30, 90];
+export const METRICS_REFRESH_MS = 30_000;
 
 export function Dashboard() {
   const token = useToken();
@@ -15,6 +17,8 @@ export function Dashboard() {
   const [days, setDays] = useState<Days>(7);
   // Cambiarla vuelve a pedir métricas y primera página, p. ej. tras crear o borrar una URL.
   const [version, setVersion] = useState(0);
+  // Solo las métricas se refrescan solas: recargar la lista perdería las páginas de "Cargar más".
+  const [metricsTick, setMetricsTick] = useState(0);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [items, setItems] = useState<DashboardUrl[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -48,7 +52,15 @@ export function Dashboard() {
     return () => {
       ignore = true;
     };
-  }, [token, days, version, toMessage]);
+  }, [token, days, version, metricsTick, toMessage]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      // Con la pestaña oculta nadie mira el panel: no vale la pena consultar al servidor.
+      if (document.visibilityState === 'visible') setMetricsTick((tick) => tick + 1);
+    }, METRICS_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -124,20 +136,38 @@ export function Dashboard() {
             </button>
           ))}
         </div>
-        {/* Para ver los clicks nuevos tras probar un enlace corto sin recargar la página. */}
-        <button type="button" className="secondary" disabled={loading} onClick={reload}>
-          {loading ? 'Actualizando…' : 'Actualizar métricas'}
-        </button>
+        <div className="toolbar-end">
+          <span className="live">
+            <span className="live-dot" aria-hidden="true" />
+            Se actualiza solo cada {METRICS_REFRESH_MS / 1000} s
+          </span>
+          {/* Para ver los clicks nuevos al momento, sin esperar al refresco automático. */}
+          <button type="button" className="secondary with-icon" disabled={loading} onClick={reload}>
+            <Icon name="refresh-cw" className={loading ? 'spin' : undefined} />
+            {loading ? 'Actualizando…' : 'Actualizar métricas'}
+          </button>
+        </div>
       </div>
 
       {error && (
-        <p className="error" role="alert">
+        <p className="error with-icon" role="alert">
+          <Icon name="circle-alert" />
           {error}
         </p>
       )}
 
       {overview === null ? (
-        !metricsError && <p className="muted">Cargando…</p>
+        !metricsError && (
+          <div className="skeletons">
+            <p className="visually-hidden">Cargando métricas…</p>
+            <div className="metrics" aria-hidden="true">
+              <div className="card skeleton" />
+              <div className="card skeleton" />
+              <div className="card skeleton" />
+            </div>
+            <div className="card skeleton skeleton-chart" aria-hidden="true" />
+          </div>
+        )
       ) : (
         <>
           <Metrics overview={overview} />
@@ -149,6 +179,7 @@ export function Dashboard() {
           items={items}
           hasMore={nextCursor !== null}
           loadingMore={loadingMore}
+          highlightCode={created?.code ?? null}
           onLoadMore={loadMore}
           onRemoved={handleRemoved}
         />

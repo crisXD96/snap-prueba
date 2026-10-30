@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, register, UNEXPECTED_ERROR } from '../api.ts';
 import { useSession } from '../session.tsx';
+import { Icon } from './Icon.tsx';
 
 // Debe coincidir con la regla del backend; el backend sigue siendo quien valida.
 const MIN_PASSWORD_LENGTH = 8;
@@ -28,25 +29,37 @@ export function RegisterForm() {
 
   return (
     <form className="form" onSubmit={handleSubmit}>
-      <h1>Crea tu cuenta</h1>
+      <div className="form-heading">
+        <h1>Crea tu cuenta</h1>
+        <p className="muted">Empieza a acortar enlaces en segundos.</p>
+      </div>
       <label>
         Nombre
-        <input autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
+        <span className="field">
+          <Icon name="user" />
+          <input autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
+        </span>
       </label>
       <label>
         Email
-        <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <span className="field">
+          <Icon name="mail" />
+          <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </span>
       </label>
       <label>
         Password
-        <input
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={MIN_PASSWORD_LENGTH}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <span className="field">
+          <Icon name="lock" />
+          <input
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </span>
       </label>
       <p className="hint">Mínimo {MIN_PASSWORD_LENGTH} caracteres.</p>
       {error && (
@@ -54,7 +67,8 @@ export function RegisterForm() {
           {error}
         </p>
       )}
-      <button type="submit" disabled={submitting}>
+      <button type="submit" className="primary with-icon" disabled={submitting}>
+        <Icon name="user-plus" />
         {submitting ? 'Creando cuenta…' : 'Crear cuenta'}
       </button>
     </form>

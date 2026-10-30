@@ -1,8 +1,9 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardUrl } from '../api.ts';
 import { App } from '../App.tsx';
+import { METRICS_REFRESH_MS } from '../components/Dashboard.tsx';
 import { SessionProvider } from '../session.tsx';
 import { ana, fakeToken, jsonResponse, mockFetch, overview, urlItem, urlsPage } from './fetch-mock.ts';
 
@@ -373,6 +374,57 @@ describe('SPA de Snap', () => {
     await user.click(await screen.findByRole('button', { name: '30 días' }));
 
     expect(await screen.findByText('Clicks en 30 días')).toBeTruthy();
+  });
+
+  describe('refresco automático de métricas', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    function panelRoutes(clicks: () => number) {
+      return {
+        'POST /auth/login': loginOk,
+        'GET /dashboard?days=7': () =>
+          jsonResponse(
+            200,
+            overview([urlItem('aB3xK9z')], {
+              totals: { urls: 1, clicks: clicks(), urlsWithoutClicks: 0, lastClickAt: null },
+            }),
+          ),
+        'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('aB3xK9z')])),
+      };
+    }
+
+    it('actualiza las métricas cada 30 segundos sin tocar el botón y sin recargar la lista', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let totalClicks = 0;
+      const fetchMock = mockFetch(panelRoutes(() => totalClicks));
+      const user = renderApp();
+      await signInAsAna(user);
+      const metrics = await screen.findByRole('region', { name: 'Métricas' });
+
+      totalClicks = 23;
+      await act(() => vi.advanceTimersByTimeAsync(METRICS_REFRESH_MS));
+
+      expect(await within(metrics).findByText('23')).toBeTruthy();
+      const listRequests = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/dashboard/urls'));
+      expect(listRequests).toHaveLength(1);
+    });
+
+    it('no consulta las métricas mientras la pestaña está oculta', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const fetchMock = mockFetch(panelRoutes(() => 0));
+      const user = renderApp();
+      await signInAsAna(user);
+      await screen.findByRole('region', { name: 'Métricas' });
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+
+      await act(() => vi.advanceTimersByTimeAsync(METRICS_REFRESH_MS * 3));
+
+      const metricsRequests = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/dashboard?'));
+      expect(metricsRequests).toHaveLength(1);
+    });
   });
 
   it('cambiar el periodo no vuelve a pedir la lista ni pierde las páginas ya cargadas', async () => {

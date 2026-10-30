@@ -62,12 +62,14 @@ Si se despliega detrás de un proxy o balanceador, hay que activar `app.set('tru
 
 ### Pantallas
 
-- **Inicio de sesión y registro**: formularios con los mensajes de error que devuelve la API (credenciales incorrectas, email ya registrado, validaciones).
+- **Inicio de sesión y registro**: portada con lo que hace Snap y formularios con los mensajes de error que devuelve la API (credenciales incorrectas, email ya registrado, validaciones, demasiados intentos).
 - **Panel**:
-  - Formulario para acortar una URL, con el enlace corto listo para copiar.
-  - Métricas del periodo (7, 30 o 90 días): clicks del periodo y variación contra el anterior, clicks totales y URLs sin clicks.
-  - Gráfica de clicks por día con un resumen del periodo (total y día con más clicks) y botón **Actualizar métricas** para ver clicks nuevos sin recargar. Con lector de pantalla, la gráfica se lee como una tabla de clicks por día.
+  - Formulario para acortar una URL, con el enlace corto listo para copiar. La URL nueva aparece resaltada en la lista.
+  - Métricas del periodo (7, 30 o 90 días): clicks del periodo y variación contra el anterior, clicks totales y URLs sin clicks. **Se actualizan solas cada 30 segundos** mientras la pestaña está visible; el botón **Actualizar métricas** lo hace al momento.
+  - Gráfica de clicks por día con un resumen del periodo (total y día con más clicks). Con lector de pantalla, la gráfica se lee como una tabla de clicks por día.
   - Lista paginada de tus URLs con clicks, fechas, **Copiar enlace** y borrado con confirmación. En celular y tablet vertical cada URL se muestra como tarjeta.
+
+Tiene tema claro y oscuro según el sistema, íconos de [Lucide](https://lucide.dev) y animaciones de entrada, que se desactivan si el sistema pide reducir el movimiento.
 
 La vista depende de la sesión, no de la URL: en `/` se muestra el panel si hay sesión y el login si no.
 

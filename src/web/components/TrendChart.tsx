@@ -1,5 +1,6 @@
 import type { DashboardOverview } from '../api.ts';
 import { formatDay, formatNumber } from '../format.ts';
+import { Icon } from './Icon.tsx';
 
 type ClicksByDay = DashboardOverview['trend']['clicksByDay'];
 
@@ -43,24 +44,36 @@ export function TrendChart({ clicksByDay }: { clicksByDay: ClicksByDay }) {
 
   return (
     <section className="card trend">
-      <h2>Clicks por día</h2>
+      <h2 className="with-icon">
+        <Icon name="bar-chart" />
+        Clicks por día
+      </h2>
       <p className="muted">{summary(clicksByDay)}</p>
 
       {/* El dibujo es solo visual: los lectores de pantalla leen la tabla de abajo. Las alturas van
-          en atributos SVG y no en style, para que una CSP estricta no lo rompa. */}
+          en atributos SVG y no en style, para que una CSP estricta no lo rompa. La key con el
+          número de días vuelve a montar las barras y repite la animación al cambiar de periodo. */}
       <svg
+        key={clicksByDay.length}
         className="bars"
         viewBox={`0 0 ${clicksByDay.length} ${CHART_HEIGHT}`}
         preserveAspectRatio="none"
         aria-hidden="true"
         focusable="false"
       >
+        <defs>
+          {/* Los colores salen de las variables del tema vía CSS (stop-color), no de atributos. */}
+          <linearGradient id="trend-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" className="trend-stop-top" />
+            <stop offset="100%" className="trend-stop-bottom" />
+          </linearGradient>
+        </defs>
         {clicksByDay.map(({ day, clicks }, i) => {
           const height = Math.max(MIN_BAR_HEIGHT, (clicks / max) * CHART_HEIGHT);
           return (
             <rect
               key={day}
-              className="bar"
+              className={clicks > 0 ? 'bar has-clicks' : 'bar'}
               x={i + BAR_GAP / 2}
               y={CHART_HEIGHT - height}
               width={1 - BAR_GAP}

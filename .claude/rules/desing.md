@@ -11,7 +11,7 @@ paths:
 - Las dependencias llegan por parámetro: el router recibe `db` y, si tiene rutas protegidas, `requireAuth`. Solo `server.ts` y `shared/db.ts` leen `process.env`; ningún módulo conoce `JWT_SECRET`.
 - El router nuevo se monta en `app.ts` antes de `createUrlsRouter` si declara rutas de un solo segmento, para que `GET /:code` no las intercepte, y siempre antes de la SPA estática.
 - El service recibe la entrada del body o la query como `unknown`, la valida y lanza errores de dominio (`class XError extends Error {}`) con mensajes en español para el usuario. El router traduce cada error esperado a su código HTTP con `{ error: mensaje }` y relanza los demás.
-- El repository solo hace SQL con parámetros `?`, prepara la sentencia en cada llamada y convierte las filas `snake_case` en records `camelCase`. La lógica de negocio no va aquí.
+- El repository solo hace SQL con parámetros `?`, declara cada sentencia con `lazyStatement(db, sql)` de `shared/db.ts` (se prepara en el primer uso, así la app arranca aunque falten tablas) y convierte las filas `snake_case` en records `camelCase`. Nunca `db.prepare` directo en un repository. La lógica de negocio no va aquí.
 - TypeScript del backend: imports relativos con extensión `.ts`, `import type` para los tipos (`verbatimModuleSyntax`) y nada que no se pueda borrar al ejecutar (`erasableSyntaxOnly`): sin `enum`, sin `namespace` con valores, sin parameter properties.
 - Respuestas JSON: arreglos y objetos en `camelCase`. Nunca devolver campos internos como `passwordHash` o `userId` en endpoints públicos.
 

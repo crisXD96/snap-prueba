@@ -21,7 +21,7 @@ paths:
 ## Backend
 
 - Base real en memoria con `createTestDatabase()` de `src/shared/__tests__/test-database.ts`: aplica en orden todos los scripts de `db-scripts/`, así que un script nuevo entra solo. Nunca escribir el esquema a mano en un test, ni armar otra base en el archivo, ni usar `snap.db`.
-- Para probar una base a medio migrar, pasar menos scripts: `createTestDatabase(SCHEMA_SCRIPTS.filter((file) => file < '004_create_clicks.sql'))`. Con `createTestDatabase([])` la base queda sin tablas.
+- Para probar una base a medio migrar, pasar menos scripts: `createTestDatabase(SCHEMA_SCRIPTS.filter((file) => file < '004_create_clicks.sql'))`. Con `createTestDatabase([])` la base queda sin tablas, y `applySchemaScripts(db)` las crea después, como el DBA sobre una base en uso.
 - Tests de API: levantar `createApp(db, secreto, webDir?)` con `.listen(0, '127.0.0.1')` y pegarle con `fetch` real. El secreto se genera con `randomBytes(32)`. Cerrar el servidor en `afterAll`.
 - Tests de service: usar los repositorios reales sobre la base en memoria. Lo que se inyecta para probar casos límite (p. ej. `nextCode` en `createUrlsService` para forzar colisiones) es parte de la API pública del service, no un mock.
 - Los usuarios de prueba se crean por la API (`/auth/register`) o con el repositorio, no insertando filas a mano, salvo que el test verifique justo el dato guardado.

@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import type { JwtPayload } from 'jsonwebtoken';
 import type { UserRecord, UsersRepository } from './auth.repository.ts';
 
 const BCRYPT_COST = 10;
@@ -33,11 +34,14 @@ export interface PublicUser {
 export interface AuthResult {
   user: PublicUser;
   token: string;
+  // Lo mismo que el exp del token, para quien no puede leerlo (la SPA, que lo recibe en cookie).
+  expiresAt: string;
 }
 
 export interface AuthService {
   register(input: RegisterInput): Promise<AuthResult>;
   login(email: unknown, password: unknown): Promise<AuthResult>;
+  findUser(id: number): PublicUser | undefined;
 }
 
 export function normalizeEmail(email: string): string {
@@ -72,7 +76,8 @@ export function createAuthService(repository: UsersRepository, jwtSecret: string
       subject: String(user.id),
       expiresIn: TOKEN_TTL,
     });
-    return { user: toPublicUser(user), token };
+    const { exp } = jwt.decode(token) as JwtPayload;
+    return { user: toPublicUser(user), token, expiresAt: new Date((exp ?? 0) * 1000).toISOString() };
   }
 
   return {
@@ -95,6 +100,11 @@ export function createAuthService(repository: UsersRepository, jwtSecret: string
         throw new InvalidCredentialsError('Email o password incorrectos');
       }
       return authResult(user);
+    },
+
+    findUser(id) {
+      const user = repository.findById(id);
+      return user ? toPublicUser(user) : undefined;
     },
   };
 }

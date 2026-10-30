@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiError, login } from '../api.ts';
+import { ApiError, login, UNEXPECTED_ERROR } from '../api.ts';
 import { useSession } from '../session.tsx';
+import { Icon } from './Icon.tsx';
 
 export function LoginForm() {
   const { signIn } = useSession();
@@ -18,34 +19,44 @@ export function LoginForm() {
       signIn(await login(email, password));
     } catch (caught) {
       // Aquí un 401 son credenciales incorrectas, no una sesión expirada.
-      setError(caught instanceof ApiError ? caught.message : 'Ocurrió un error inesperado. Intenta de nuevo.');
+      setError(caught instanceof ApiError ? caught.message : UNEXPECTED_ERROR);
       setSubmitting(false);
     }
   }
 
   return (
     <form className="form" onSubmit={handleSubmit}>
-      <h1>Inicia sesión</h1>
+      <div className="form-heading">
+        <h1>Inicia sesión</h1>
+        <p className="muted">Entra para ver tus enlaces y sus clicks.</p>
+      </div>
       <label>
         Email
-        <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <span className="field">
+          <Icon name="mail" />
+          <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </span>
       </label>
       <label>
         Password
-        <input
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <span className="field">
+          <Icon name="lock" />
+          <input
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </span>
       </label>
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-      <button type="submit" disabled={submitting}>
+      <button type="submit" className="primary with-icon" disabled={submitting}>
+        <Icon name="log-in" />
         {submitting ? 'Entrando…' : 'Entrar'}
       </button>
     </form>

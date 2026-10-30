@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { lazyStatement } from '../../shared/db.ts';
 
 export interface NewClick {
   code: string;
@@ -10,11 +11,12 @@ export interface ClicksRepository {
   record(click: NewClick): void;
 }
 
-// Igual que en urls: se prepara en cada llamada para no exigir la tabla al arrancar.
 export function createClicksRepository(db: DatabaseSync): ClicksRepository {
+  const insert = lazyStatement(db, 'INSERT INTO clicks (code, referrer, user_agent) VALUES (?, ?, ?)');
+
   return {
     record({ code, referrer, userAgent }) {
-      db.prepare('INSERT INTO clicks (code, referrer, user_agent) VALUES (?, ?, ?)').run(code, referrer, userAgent);
+      insert().run(code, referrer, userAgent);
     },
   };
 }

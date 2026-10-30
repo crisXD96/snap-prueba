@@ -17,10 +17,14 @@ export interface User {
   createdAt: string;
 }
 
-export interface AuthResult {
+// La sesión que conoce la SPA: el token viaja en una cookie HttpOnly que el JavaScript no puede leer.
+export interface SessionInfo {
   user: User;
-  token: string;
+  expiresAt: string;
 }
+
+// El body del login y del registro también trae el token, para los clientes de la API; la SPA lo ignora.
+export type AuthResult = SessionInfo;
 
 export interface ShortUrl {
   code: string;
@@ -46,15 +50,18 @@ export interface DashboardOverview {
     changePercent: number | null;
     clicksByDay: { day: string; clicks: number }[];
   };
-  urls: { items: DashboardUrl[]; nextCursor: string | null };
 }
 
-const UNEXPECTED_ERROR = 'Ocurrió un error inesperado. Intenta de nuevo.';
+export interface DashboardUrlsPage {
+  items: DashboardUrl[];
+  nextCursor: string | null;
+}
+
+export const UNEXPECTED_ERROR = 'Ocurrió un error inesperado. Intenta de nuevo.';
 const NETWORK_ERROR = 'No se pudo conectar con el servidor.';
 
 interface RequestOptions {
   method?: string;
-  token?: string;
   body?: unknown;
 }
 
@@ -68,14 +75,19 @@ async function errorMessage(res: Response): Promise<string> {
   return UNEXPECTED_ERROR;
 }
 
-async function request<T>(path: string, { method = 'GET', token, body }: RequestOptions = {}): Promise<T> {
+async function request<T>(path: string, { method = 'GET', body }: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
-  if (token !== undefined) headers.authorization = `Bearer ${token}`;
 
   let res: Response;
   try {
-    res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    // same-origin: la cookie de sesión viaja con cada petición a la propia API y a ningún otro sitio.
+    res = await fetch(path, {
+      method,
+      headers,
+      credentials: 'same-origin',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
   } catch {
     throw new ApiError(0, NETWORK_ERROR);
   }
@@ -93,17 +105,29 @@ export function login(email: string, password: string): Promise<AuthResult> {
   return request('/auth/login', { method: 'POST', body: { email, password } });
 }
 
-export function shorten(token: string, url: string): Promise<ShortUrl> {
-  return request('/urls', { method: 'POST', token, body: { url } });
+// La sesión de la cookie, si hay: con ella la SPA sobrevive a recargar la página.
+export function getSession(): Promise<SessionInfo> {
+  return request('/auth/me');
 }
 
-export function removeUrl(token: string, code: string): Promise<void> {
-  return request(`/urls/${encodeURIComponent(code)}`, { method: 'DELETE', token });
+export function logout(): Promise<void> {
+  return request('/auth/logout', { method: 'POST' });
 }
 
-export function getDashboard(token: string, days: Days, cursor?: string): Promise<DashboardOverview> {
+export function shorten(url: string): Promise<ShortUrl> {
+  return request('/urls', { method: 'POST', body: { url } });
+}
+
+export function removeUrl(code: string): Promise<void> {
+  return request(`/urls/${encodeURIComponent(code)}`, { method: 'DELETE' });
+}
+
+export function getDashboard(days: Days): Promise<DashboardOverview> {
+  return request(`/dashboard?${new URLSearchParams({ days: String(days) })}`);
+}
+
+export function getDashboardUrls(cursor?: string): Promise<DashboardUrlsPage> {
   // El backend rechaza un cursor vacío: si no hay, se omite.
-  const query = new URLSearchParams({ days: String(days) });
-  if (cursor !== undefined) query.set('cursor', cursor);
-  return request(`/dashboard?${query}`, { token });
+  const query = cursor === undefined ? '' : `?${new URLSearchParams({ cursor })}`;
+  return request(`/dashboard/urls${query}`);
 }

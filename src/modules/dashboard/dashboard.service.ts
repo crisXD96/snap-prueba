@@ -13,8 +13,11 @@ const CURSOR_ID_PATTERN = /^[1-9]\d*$/;
 export class InvalidDashboardQueryError extends Error {}
 
 // Llegan sin tipar desde la query string; el servicio los valida.
-export interface DashboardQuery {
+export interface OverviewQuery {
   days: unknown;
+}
+
+export interface UrlsPageQuery {
   cursor: unknown;
 }
 
@@ -37,11 +40,18 @@ export interface DashboardOverview {
     changePercent: number | null;
     clicksByDay: DayClicks[];
   };
-  urls: { items: DashboardUrl[]; nextCursor: string | null };
 }
 
+export interface DashboardUrlsPage {
+  items: DashboardUrl[];
+  nextCursor: string | null;
+}
+
+// Métricas y lista van por separado: cambiar el periodo no recarga la lista y paginar no
+// recalcula las métricas.
 export interface DashboardService {
-  getOverview(userId: number, query: DashboardQuery): DashboardOverview;
+  getOverview(userId: number, query: OverviewQuery): DashboardOverview;
+  getUrlsPage(userId: number, query: UrlsPageQuery): DashboardUrlsPage;
 }
 
 function parseDays(raw: unknown): number {
@@ -96,18 +106,12 @@ export function createDashboardService(
   return {
     getOverview(userId, query) {
       const days = parseDays(query.days);
-      const after = decodeCursor(query.cursor);
       const { dayNames, from, to, since, previousSince } = periodBounds(now(), days);
 
       const clicksPerDay = new Map(repository.clicksByDay(userId, since, UTC_OFFSET_HOURS).map((d) => [d.day, d.clicks]));
       const clicksByDay = dayNames.map((day) => ({ day, clicks: clicksPerDay.get(day) ?? 0 }));
       const clicks = clicksByDay.reduce((sum, d) => sum + d.clicks, 0);
       const previousClicks = repository.countClicks(userId, previousSince, since);
-
-      // Se pide una de más para saber si hay otra página sin contar todas las URLs.
-      const page = repository.urlsPage(userId, PAGE_SIZE + 1, after);
-      const items = page.slice(0, PAGE_SIZE);
-      const last = items.at(-1);
 
       return {
         period: { days, from, to, utcOffset: UTC_OFFSET },
@@ -118,10 +122,18 @@ export function createDashboardService(
           changePercent: previousClicks === 0 ? null : Math.round(((clicks - previousClicks) / previousClicks) * 1000) / 10,
           clicksByDay,
         },
-        urls: {
-          items: items.map(({ code, url, createdAt, clicks, lastClickAt }) => ({ code, url, createdAt, clicks, lastClickAt })),
-          nextCursor: page.length > PAGE_SIZE && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
-        },
+      };
+    },
+
+    getUrlsPage(userId, query) {
+      const after = decodeCursor(query.cursor);
+      // Se pide una de más para saber si hay otra página sin contar todas las URLs.
+      const page = repository.urlsPage(userId, PAGE_SIZE + 1, after);
+      const items = page.slice(0, PAGE_SIZE);
+      const last = items.at(-1);
+      return {
+        items: items.map(({ code, url, createdAt, clicks, lastClickAt }) => ({ code, url, createdAt, clicks, lastClickAt })),
+        nextCursor: page.length > PAGE_SIZE && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
       };
     },
   };

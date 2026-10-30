@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { lazyStatement } from '../../shared/db.ts';
 
 export interface DashboardTotals {
   urls: number;
@@ -72,21 +73,46 @@ function toUrlStats(row: UrlStatsRow): UrlStats {
   };
 }
 
-// Igual que en urls: se prepara en cada llamada para no exigir las tablas al arrancar.
 export function createDashboardRepository(db: DatabaseSync): DashboardRepository {
+  const totals = lazyStatement(
+    db,
+    // MATERIALIZED: sin él, SQLite repite el conteo de clicks por cada SUM que lo usa.
+    `WITH stats AS MATERIALIZED (SELECT ${CLICK_STATS_COLUMNS} FROM urls u WHERE u.user_id = ?)
+     SELECT COUNT(*) AS urls,
+            COALESCE(SUM(clicks), 0) AS clicks,
+            COALESCE(SUM(clicks = 0), 0) AS urls_without_clicks,
+            MAX(last_click_at) AS last_click_at
+     FROM stats`,
+  );
+  const firstPage = lazyStatement(
+    db,
+    `SELECT ${URL_STATS_COLUMNS} FROM urls u
+     WHERE u.user_id = ?
+     ORDER BY u.created_at DESC, u.rowid DESC LIMIT ?`,
+  );
+  const pageAfter = lazyStatement(
+    db,
+    `SELECT ${URL_STATS_COLUMNS} FROM urls u
+     WHERE u.user_id = ? AND (u.created_at, u.rowid) < (?, ?)
+     ORDER BY u.created_at DESC, u.rowid DESC LIMIT ?`,
+  );
+  const clicksByDay = lazyStatement(
+    db,
+    `SELECT date(c.clicked_at, ?) AS day, COUNT(*) AS clicks
+     FROM clicks c JOIN urls u ON u.code = c.code
+     WHERE u.user_id = ? AND c.clicked_at >= ?
+     GROUP BY day`,
+  );
+  const countClicks = lazyStatement(
+    db,
+    `SELECT COUNT(*) AS clicks
+     FROM clicks c JOIN urls u ON u.code = c.code
+     WHERE u.user_id = ? AND c.clicked_at >= ? AND c.clicked_at < ?`,
+  );
+
   return {
     totals(userId) {
-      const row = db
-        .prepare(
-          // MATERIALIZED: sin él, SQLite repite el conteo de clicks por cada SUM que lo usa.
-          `WITH stats AS MATERIALIZED (SELECT ${CLICK_STATS_COLUMNS} FROM urls u WHERE u.user_id = ?)
-           SELECT COUNT(*) AS urls,
-                  COALESCE(SUM(clicks), 0) AS clicks,
-                  COALESCE(SUM(clicks = 0), 0) AS urls_without_clicks,
-                  MAX(last_click_at) AS last_click_at
-           FROM stats`,
-        )
-        .get(userId) as unknown as TotalsRow;
+      const row = totals().get(userId) as unknown as TotalsRow;
       return {
         urls: row.urls,
         clicks: row.clicks,
@@ -97,44 +123,17 @@ export function createDashboardRepository(db: DatabaseSync): DashboardRepository
 
     urlsPage(userId, limit, after) {
       const rows = (
-        after
-          ? db
-              .prepare(
-                `SELECT ${URL_STATS_COLUMNS} FROM urls u
-                 WHERE u.user_id = ? AND (u.created_at, u.rowid) < (?, ?)
-                 ORDER BY u.created_at DESC, u.rowid DESC LIMIT ?`,
-              )
-              .all(userId, after.createdAt, after.id, limit)
-          : db
-              .prepare(
-                `SELECT ${URL_STATS_COLUMNS} FROM urls u
-                 WHERE u.user_id = ?
-                 ORDER BY u.created_at DESC, u.rowid DESC LIMIT ?`,
-              )
-              .all(userId, limit)
+        after ? pageAfter().all(userId, after.createdAt, after.id, limit) : firstPage().all(userId, limit)
       ) as unknown as UrlStatsRow[];
       return rows.map(toUrlStats);
     },
 
     clicksByDay(userId, since, utcOffsetHours) {
-      return db
-        .prepare(
-          `SELECT date(c.clicked_at, ?) AS day, COUNT(*) AS clicks
-           FROM clicks c JOIN urls u ON u.code = c.code
-           WHERE u.user_id = ? AND c.clicked_at >= ?
-           GROUP BY day`,
-        )
-        .all(`${utcOffsetHours} hours`, userId, since) as unknown as DayClicks[];
+      return clicksByDay().all(`${utcOffsetHours} hours`, userId, since) as unknown as DayClicks[];
     },
 
     countClicks(userId, from, to) {
-      const row = db
-        .prepare(
-          `SELECT COUNT(*) AS clicks
-           FROM clicks c JOIN urls u ON u.code = c.code
-           WHERE u.user_id = ? AND c.clicked_at >= ? AND c.clicked_at < ?`,
-        )
-        .get(userId, from, to) as unknown as { clicks: number };
+      const row = countClicks().get(userId, from, to) as unknown as { clicks: number };
       return row.clicks;
     },
   };

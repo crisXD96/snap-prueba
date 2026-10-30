@@ -1,9 +1,11 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { DashboardUrl } from '../api.ts';
 import { App } from '../App.tsx';
+import { METRICS_REFRESH_MS } from '../components/Dashboard.tsx';
 import { SessionProvider } from '../session.tsx';
-import { ana, fakeToken, jsonResponse, mockFetch, overview, urlItem } from './fetch-mock.ts';
+import { authResult, jsonResponse, mockFetch, overview, urlItem, urlsPage } from './fetch-mock.ts';
 
 function renderApp() {
   render(
@@ -14,13 +16,14 @@ function renderApp() {
   return userEvent.setup();
 }
 
+// El login aparece después de que el servidor dice que no hay cookie de sesión: se espera.
 async function signInAsAna(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText('Email'), 'ana@example.com');
+  await user.type(await screen.findByLabelText('Email'), 'ana@example.com');
   await user.type(screen.getByLabelText('Password'), 'contraseña-segura');
   await user.click(screen.getByRole('button', { name: 'Entrar' }));
 }
 
-const loginOk = () => jsonResponse(200, { user: ana, token: fakeToken() });
+const loginOk = () => jsonResponse(200, authResult());
 
 // La fila de la tabla donde aparece el enlace corto de ese código.
 async function findRow(code: string): Promise<HTMLElement> {
@@ -42,6 +45,7 @@ describe('SPA de Snap', () => {
             totals: { urls: 1, clicks: 340, urlsWithoutClicks: 0, lastClickAt: '2026-10-29T17:00:00.000Z' },
           }),
         ),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('aB3xK9z', { clicks: 21 })])),
     });
     const user = renderApp();
 
@@ -51,7 +55,65 @@ describe('SPA de Snap', () => {
     expect(within(metrics).getByText('340')).toBeTruthy();
     expect(screen.getByText('Ana')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'aB3xK9z' }).getAttribute('href')).toBe(`${window.location.origin}/aB3xK9z`);
-    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ authorization: expect.stringMatching(/^Bearer /) });
+    // La sesión viaja en la cookie: el JavaScript no maneja el token ni manda Authorization.
+    const dashboardCall = fetchMock.mock.calls.find(([input]) => String(input).startsWith('/dashboard?'));
+    expect(dashboardCall?.[1]?.credentials).toBe('same-origin');
+    expect(dashboardCall?.[1]?.headers).not.toHaveProperty('authorization');
+  });
+
+  describe('sesión al cargar la página', () => {
+    const panelRoutes = {
+      'GET /dashboard?days=7': () => jsonResponse(200, overview([urlItem('aB3xK9z')])),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('aB3xK9z')])),
+    };
+
+    it('con una cookie de sesión válida entra directo al panel, sin pedir login', async () => {
+      const fetchMock = mockFetch({ 'GET /auth/me': () => jsonResponse(200, authResult()), ...panelRoutes });
+
+      renderApp();
+
+      expect(await screen.findByRole('region', { name: 'Métricas' })).toBeTruthy();
+      expect(screen.getByText('Ana')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Entrar' })).toBeNull();
+      expect(fetchMock.mock.calls.some(([input]) => String(input) === '/auth/login')).toBe(false);
+    });
+
+    it('sin cookie de sesión muestra el login y no pide el panel', async () => {
+      const fetchMock = mockFetch(panelRoutes);
+
+      renderApp();
+
+      expect(await screen.findByRole('button', { name: 'Entrar' })).toBeTruthy();
+      expect(fetchMock.mock.calls.some(([input]) => String(input).startsWith('/dashboard'))).toBe(false);
+    });
+
+    it('mientras comprueba la sesión no muestra el login, para que no parpadee al recargar', async () => {
+      let answer: (res: Response) => void = () => {};
+      mockFetch({
+        'GET /auth/me': () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      });
+
+      renderApp();
+
+      expect(await screen.findByText('Comprobando tu sesión…')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Entrar' })).toBeNull();
+      answer(jsonResponse(401, { error: 'Token requerido' }));
+      expect(await screen.findByRole('button', { name: 'Entrar' })).toBeTruthy();
+    });
+
+    it('Cerrar sesión borra la cookie en el servidor y vuelve al login', async () => {
+      const fetchMock = mockFetch({ 'GET /auth/me': () => jsonResponse(200, authResult()), ...panelRoutes });
+      const user = renderApp();
+      await screen.findByRole('region', { name: 'Métricas' });
+
+      await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+
+      expect(await screen.findByRole('button', { name: 'Entrar' })).toBeTruthy();
+      expect(fetchMock.mock.calls.some(([input, init]) => String(input) === '/auth/logout' && init?.method === 'POST')).toBe(true);
+    });
   });
 
   it('muestra el error del backend cuando las credenciales son incorrectas', async () => {
@@ -66,19 +128,21 @@ describe('SPA de Snap', () => {
 
   it('registra una cuenta nueva y entra al panel', async () => {
     const fetchMock = mockFetch({
-      'POST /auth/register': () => jsonResponse(201, { user: ana, token: fakeToken() }),
+      'POST /auth/register': () => jsonResponse(201, authResult()),
       'GET /dashboard?days=7': () => jsonResponse(200, overview()),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage()),
     });
     const user = renderApp();
 
-    await user.click(screen.getByRole('button', { name: 'Regístrate' }));
+    await user.click(await screen.findByRole('button', { name: 'Regístrate' }));
     await user.type(screen.getByLabelText('Nombre'), 'Ana');
     await user.type(screen.getByLabelText('Email'), 'ana@example.com');
     await user.type(screen.getByLabelText('Password'), 'contraseña-segura');
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
 
     expect(await screen.findByText('Aún no has acortado ninguna URL.')).toBeTruthy();
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+    const registerCall = fetchMock.mock.calls.find(([input]) => String(input) === '/auth/register');
+    expect(JSON.parse(String(registerCall?.[1]?.body))).toEqual({
       name: 'Ana',
       email: 'ana@example.com',
       password: 'contraseña-segura',
@@ -90,6 +154,7 @@ describe('SPA de Snap', () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview(urls)),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage(urls)),
       'POST /urls': () => {
         urls = [urlItem('new0001', { url: 'https://ejemplo.com/pagina' }), ...urls];
         return jsonResponse(201, { code: 'new0001', url: 'https://ejemplo.com/pagina' });
@@ -111,6 +176,7 @@ describe('SPA de Snap', () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview()),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage()),
       'POST /urls': () => jsonResponse(201, { code: 'new0001', url: 'https://ejemplo.com' }),
     });
     const user = renderApp();
@@ -130,6 +196,7 @@ describe('SPA de Snap', () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview([urlItem('aB3xK9z'), urlItem('zZ9yY8x')])),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('aB3xK9z'), urlItem('zZ9yY8x')])),
     });
     const user = renderApp();
     await signInAsAna(user);
@@ -146,6 +213,7 @@ describe('SPA de Snap', () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview([urlItem('aB3xK9z')])),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('aB3xK9z')])),
     });
     const user = renderApp();
     await signInAsAna(user);
@@ -161,6 +229,7 @@ describe('SPA de Snap', () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview()),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage()),
       'POST /urls': () => jsonResponse(400, { error: 'La url debe ser http o https' }),
     });
     const user = renderApp();
@@ -184,6 +253,7 @@ describe('SPA de Snap', () => {
             totals: { urls: 1, clicks: totalClicks, urlsWithoutClicks: totalClicks === 0 ? 1 : 0, lastClickAt: null },
           }),
         ),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('aB3xK9z')])),
     });
     const user = renderApp();
     await signInAsAna(user);
@@ -201,6 +271,7 @@ describe('SPA de Snap', () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview()),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage()),
       'POST /urls': () => jsonResponse(401, { error: 'Token inválido o expirado' }),
     });
     const user = renderApp();
@@ -217,6 +288,7 @@ describe('SPA de Snap', () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview([urlItem('aB3xK9z')])),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('aB3xK9z')])),
       'DELETE /urls/aB3xK9z': () => jsonResponse(403, { error: 'La url pertenece a otro usuario' }),
     });
     const user = renderApp();
@@ -234,6 +306,7 @@ describe('SPA de Snap', () => {
     const fetchMock = mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview(urls)),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage(urls)),
       'DELETE /urls/aB3xK9z': () => {
         urls = [];
         return new Response(null, { status: 204 });
@@ -250,12 +323,68 @@ describe('SPA de Snap', () => {
     expect(await screen.findByText('Aún no has acortado ninguna URL.')).toBeTruthy();
   });
 
+  it('quita el aviso de la URL recién creada cuando se borra esa URL', async () => {
+    let urls: DashboardUrl[] = [];
+    mockFetch({
+      'POST /auth/login': loginOk,
+      'GET /dashboard?days=7': () => jsonResponse(200, overview(urls)),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage(urls)),
+      'POST /urls': () => {
+        urls = [urlItem('new0001')];
+        return jsonResponse(201, { code: 'new0001', url: 'https://example.com/new0001' });
+      },
+      'DELETE /urls/new0001': () => {
+        urls = [];
+        return new Response(null, { status: 204 });
+      },
+    });
+    const user = renderApp();
+    await signInAsAna(user);
+    await user.type(await screen.findByLabelText('URL a acortar'), 'example.com/new0001');
+    await user.click(screen.getByRole('button', { name: 'Acortar' }));
+    expect(await screen.findByRole('status')).toBeTruthy();
+
+    await user.click(await screen.findByRole('button', { name: 'Borrar new0001' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar borrado' }));
+
+    expect(await screen.findByText('Aún no has acortado ninguna URL.')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('mantiene el aviso de la URL recién creada cuando se borra otra URL', async () => {
+    let urls = [urlItem('old0001')];
+    mockFetch({
+      'POST /auth/login': loginOk,
+      'GET /dashboard?days=7': () => jsonResponse(200, overview(urls)),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage(urls)),
+      'POST /urls': () => {
+        urls = [urlItem('new0001'), ...urls];
+        return jsonResponse(201, { code: 'new0001', url: 'https://example.com/new0001' });
+      },
+      'DELETE /urls/old0001': () => {
+        urls = urls.filter((item) => item.code !== 'old0001');
+        return new Response(null, { status: 204 });
+      },
+    });
+    const user = renderApp();
+    await signInAsAna(user);
+    await user.type(await screen.findByLabelText('URL a acortar'), 'example.com/new0001');
+    await user.click(screen.getByRole('button', { name: 'Acortar' }));
+    await screen.findByRole('link', { name: 'new0001' });
+
+    await user.click(screen.getByRole('button', { name: 'Borrar old0001' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar borrado' }));
+
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'old0001' })).toBeNull());
+    expect(screen.getByRole('status').textContent).toContain(`${window.location.origin}/new0001`);
+  });
+
   it('carga la siguiente página de URLs con el cursor', async () => {
     mockFetch({
       'POST /auth/login': loginOk,
-      'GET /dashboard?days=7': () =>
-        jsonResponse(200, overview([urlItem('page001')], { urls: { items: [urlItem('page001')], nextCursor: 'c1' } })),
-      'GET /dashboard?days=7&cursor=c1': () => jsonResponse(200, overview([urlItem('page002')])),
+      'GET /dashboard?days=7': () => jsonResponse(200, overview([urlItem('page001')])),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('page001')], 'c1')),
+      'GET /dashboard/urls?cursor=c1': () => jsonResponse(200, urlsPage([urlItem('page002')])),
     });
     const user = renderApp();
     await signInAsAna(user);
@@ -267,10 +396,35 @@ describe('SPA de Snap', () => {
     expect(screen.queryByRole('button', { name: 'Cargar más' })).toBeNull();
   });
 
+  it('descarta la página siguiente si la lista se recargó mientras llegaba', async () => {
+    let deliverNextPage: (res: Response) => void = () => {};
+    mockFetch({
+      'POST /auth/login': loginOk,
+      'GET /dashboard?days=7': () => jsonResponse(200, overview([urlItem('page001')])),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('page001')], 'c1')),
+      'GET /dashboard/urls?cursor=c1': () =>
+        new Promise<Response>((resolve) => {
+          deliverNextPage = resolve;
+        }),
+    });
+    const user = renderApp();
+    await signInAsAna(user);
+    await user.click(await screen.findByRole('button', { name: 'Cargar más' }));
+    await user.click(screen.getByRole('button', { name: 'Actualizar métricas' }));
+    await screen.findByRole('button', { name: 'Actualizar métricas' });
+
+    deliverNextPage(jsonResponse(200, urlsPage([urlItem('page002')])));
+
+    expect(await screen.findByRole('button', { name: 'Cargar más' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'page002' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'page001' })).toHaveLength(1);
+  });
+
   it('pide el dashboard del periodo elegido', async () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(200, overview()),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage()),
       'GET /dashboard?days=30': () =>
         jsonResponse(200, overview([], { period: { days: 30, from: '2026-09-30', to: '2026-10-29', utcOffset: '-06:00' } })),
     });
@@ -282,10 +436,101 @@ describe('SPA de Snap', () => {
     expect(await screen.findByText('Clicks en 30 días')).toBeTruthy();
   });
 
+  describe('refresco automático de métricas', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    function panelRoutes(clicks: () => number) {
+      return {
+        'POST /auth/login': loginOk,
+        'GET /dashboard?days=7': () =>
+          jsonResponse(
+            200,
+            overview([urlItem('aB3xK9z')], {
+              totals: { urls: 1, clicks: clicks(), urlsWithoutClicks: 0, lastClickAt: null },
+            }),
+          ),
+        'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('aB3xK9z')])),
+      };
+    }
+
+    it('actualiza las métricas cada 30 segundos sin tocar el botón y sin recargar la lista', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let totalClicks = 0;
+      const fetchMock = mockFetch(panelRoutes(() => totalClicks));
+      const user = renderApp();
+      await signInAsAna(user);
+      const metrics = await screen.findByRole('region', { name: 'Métricas' });
+
+      totalClicks = 23;
+      await act(() => vi.advanceTimersByTimeAsync(METRICS_REFRESH_MS));
+
+      expect(await within(metrics).findByText('23')).toBeTruthy();
+      const listRequests = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/dashboard/urls'));
+      expect(listRequests).toHaveLength(1);
+    });
+
+    it('no consulta las métricas mientras la pestaña está oculta', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const fetchMock = mockFetch(panelRoutes(() => 0));
+      const user = renderApp();
+      await signInAsAna(user);
+      await screen.findByRole('region', { name: 'Métricas' });
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+
+      await act(() => vi.advanceTimersByTimeAsync(METRICS_REFRESH_MS * 3));
+
+      const metricsRequests = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/dashboard?'));
+      expect(metricsRequests).toHaveLength(1);
+    });
+  });
+
+  it('cambiar el periodo no vuelve a pedir la lista ni pierde las páginas ya cargadas', async () => {
+    const fetchMock = mockFetch({
+      'POST /auth/login': loginOk,
+      'GET /dashboard?days=7': () => jsonResponse(200, overview()),
+      'GET /dashboard?days=30': () =>
+        jsonResponse(200, overview([], { period: { days: 30, from: '2026-09-30', to: '2026-10-29', utcOffset: '-06:00' } })),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('page001')], 'c1')),
+      'GET /dashboard/urls?cursor=c1': () => jsonResponse(200, urlsPage([urlItem('page002')])),
+    });
+    const user = renderApp();
+    await signInAsAna(user);
+    await user.click(await screen.findByRole('button', { name: 'Cargar más' }));
+    await screen.findByRole('link', { name: 'page002' });
+
+    await user.click(screen.getByRole('button', { name: '30 días' }));
+
+    expect(await screen.findByText('Clicks en 30 días')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'page002' })).toBeTruthy();
+    const listRequests = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/dashboard/urls'));
+    expect(listRequests).toHaveLength(2);
+  });
+
+  it('Cargar más pide solo la siguiente página, sin volver a calcular las métricas', async () => {
+    const fetchMock = mockFetch({
+      'POST /auth/login': loginOk,
+      'GET /dashboard?days=7': () => jsonResponse(200, overview()),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage([urlItem('page001')], 'c1')),
+      'GET /dashboard/urls?cursor=c1': () => jsonResponse(200, urlsPage([urlItem('page002')])),
+    });
+    const user = renderApp();
+    await signInAsAna(user);
+
+    await user.click(await screen.findByRole('button', { name: 'Cargar más' }));
+
+    expect(await screen.findByRole('link', { name: 'page002' })).toBeTruthy();
+    const metricsRequests = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/dashboard?'));
+    expect(metricsRequests).toHaveLength(1);
+  });
+
   it('vuelve al login con aviso cuando el backend rechaza el token', async () => {
     mockFetch({
       'POST /auth/login': loginOk,
       'GET /dashboard?days=7': () => jsonResponse(401, { error: 'Token inválido o expirado' }),
+      'GET /dashboard/urls': () => jsonResponse(401, { error: 'Token inválido o expirado' }),
     });
     const user = renderApp();
 
@@ -297,8 +542,9 @@ describe('SPA de Snap', () => {
 
   it('cierra la sesión cuando expira el token', async () => {
     mockFetch({
-      'POST /auth/login': () => jsonResponse(200, { user: ana, token: fakeToken(-1) }),
+      'POST /auth/login': () => jsonResponse(200, authResult(-1)),
       'GET /dashboard?days=7': () => jsonResponse(200, overview()),
+      'GET /dashboard/urls': () => jsonResponse(200, urlsPage()),
     });
     const user = renderApp();
 

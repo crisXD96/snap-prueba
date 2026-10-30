@@ -1,30 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../../app.ts';
+import { createTestDatabase, SCHEMA_SCRIPTS } from '../../../shared/__tests__/test-database.ts';
 import { createUsersRepository } from '../../auth/auth.repository.ts';
 import { createClicksRepository } from '../../clicks/clicks.repository.ts';
 import { createUrlsRepository } from '../urls.repository.ts';
 import { CodeGenerationError, createUrlsService, NotUrlOwnerError, UrlNotFoundError } from '../urls.service.ts';
-
-// Se aplican en orden los mismos scripts que revisa el DBA, para probar contra el esquema real.
-const SCHEMA_SCRIPTS = ['001_create_urls.sql', '002_create_users.sql', '003_add_user_to_urls.sql', '004_create_clicks.sql'];
-
-function readScripts(files: string[]): string {
-  return files.map((file) => readFileSync(new URL(`../../../../db-scripts/${file}`, import.meta.url), 'utf8')).join('\n');
-}
-
-const schema = readScripts(SCHEMA_SCRIPTS);
-
-function createTestDatabase(script: string = schema): DatabaseSync {
-  const db = new DatabaseSync(':memory:');
-  db.exec(script);
-  return db;
-}
 
 interface ClickRow {
   referrer: string | null;
@@ -108,8 +93,10 @@ describe('API de urls', () => {
       const res = await shorten({ url: 'https://example.com/sin-token' }, null);
 
       expect(res.status).toBe(401);
-      const list = (await (await fetch(`${baseUrl}/urls`)).json()) as { url: string }[];
-      expect(list.map((item) => item.url)).not.toContain('https://example.com/sin-token');
+      const saved = db
+        .prepare('SELECT COUNT(*) AS total FROM urls WHERE original_url = ?')
+        .get('https://example.com/sin-token') as { total: number };
+      expect(saved.total).toBe(0);
     });
 
     it('rechaza con 400 una url que no es http ni https', async () => {
@@ -182,17 +169,13 @@ describe('API de urls', () => {
       expect(await res.json()).toEqual({ error: 'Código no encontrado' });
     });
 
-    it('lista sin pedir token las urls de todos, de la más reciente a la más antigua y sin exponer al dueño', async () => {
-      const primera = await createShortUrl('https://example.com/primera', anaToken);
-      const segunda = await createShortUrl('https://example.com/segunda', beaToken);
+    it('responde 404 en GET /urls: no hay un listado público de las urls', async () => {
+      await createShortUrl('https://example.com/privada', anaToken);
 
       const res = await fetch(`${baseUrl}/urls`);
 
-      expect(res.status).toBe(200);
-      const list = (await res.json()) as { code: string; url: string; createdAt: string }[];
-      const codes = list.map((item) => item.code);
-      expect(codes.indexOf(segunda.code)).toBeLessThan(codes.indexOf(primera.code));
-      expect(list).toContainEqual({ code: primera.code, url: 'https://example.com/primera', createdAt: expect.any(String) });
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain('https://example.com/privada');
     });
 
     it('no captura /health con la ruta de códigos', async () => {
@@ -354,7 +337,7 @@ describe('servicio de urls', () => {
 
   it('redirige aunque no se pueda registrar el click', () => {
     // Sin el script de clicks el INSERT falla, como cuando la base está bloqueada.
-    const db = createTestDatabase(readScripts(SCHEMA_SCRIPTS.slice(0, 3)));
+    const db = createTestDatabase(SCHEMA_SCRIPTS.filter((file) => file < '004_create_clicks.sql'));
     db.prepare("INSERT INTO urls (code, original_url) VALUES ('sinclik', 'https://example.com/sin-clicks')").run();
     const service = createUrlsService(createUrlsRepository(db), createClicksRepository(db));
     const logError = vi.spyOn(console, 'error').mockImplementation(() => {});

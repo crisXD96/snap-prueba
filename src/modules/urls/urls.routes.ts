@@ -27,11 +27,6 @@ export function createUrlsRouter(db: DatabaseSync, requireAuth: RequestHandler):
     }
   });
 
-  // Pública: no expone a qué usuario pertenece cada URL.
-  router.get('/urls', (_req, res) => {
-    res.status(200).json(service.list().map(({ code, url, createdAt }) => ({ code, url, createdAt })));
-  });
-
   router.delete('/urls/:code', requireAuth, (req, res) => {
     const { code } = req.params;
     // Con requireAuth delante, Express tipa los params de forma genérica y no asegura un string.

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Icon } from './Icon.tsx';
+import type { IconName } from './Icon.tsx';
 
 // Tiempo que se muestra el resultado antes de volver al texto original.
 const FEEDBACK_MS = 2000;
@@ -9,6 +11,12 @@ const LABELS: Record<CopyState, string> = {
   idle: 'Copiar enlace',
   copied: '¡Copiado!',
   failed: 'No se pudo copiar',
+};
+
+const ICONS: Record<CopyState, IconName> = {
+  idle: 'copy',
+  copied: 'check',
+  failed: 'x',
 };
 
 export function CopyButton({ text }: { text: string }) {
@@ -31,7 +39,8 @@ export function CopyButton({ text }: { text: string }) {
   }
 
   return (
-    <button type="button" className="copy-button" title={text} onClick={copy}>
+    <button type="button" className={`copy-button with-icon is-${state}`} title={text} onClick={copy}>
+      <Icon name={ICONS[state]} size={15} />
       {LABELS[state]}
     </button>
   );

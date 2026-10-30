@@ -22,6 +22,7 @@ npm install
 | `JWT_SECRET` | Sí | — | Firma y verifica los tokens. Sin ella el servidor no arranca. |
 | `PORT` | No | `3000` | Puerto del servidor. |
 | `DB_PATH` | No | `snap.db` | Ruta de la base SQLite. |
+| `NODE_ENV` | En producción | — | `production` en el servidor desplegado, para que Express no use su modo de desarrollo. Se define en el entorno del servidor, no en `npm start`. |
 
 Para desarrollo local se puede generar un secreto aleatorio en la terminal donde se arranca el servidor:
 
@@ -113,3 +114,4 @@ src/
 | `npm start` | Arranca la versión compilada |
 | `npm test` | Tests del backend (Node) y de la SPA (jsdom) |
 | `npm run typecheck` | Revisa tipos del backend y de la SPA |
+| `npm run verify` | `typecheck` y `test`: lo que debe pasar antes de cada commit |

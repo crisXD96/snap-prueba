@@ -24,13 +24,15 @@ npm install
 | `DB_PATH` | No | `snap.db` | Ruta de la base SQLite. |
 | `NODE_ENV` | En producción | — | `production` en el servidor desplegado, para que Express no use su modo de desarrollo. Se define en el entorno del servidor, no en `npm start`. |
 
-Para desarrollo local se puede generar un secreto aleatorio en la terminal donde se arranca el servidor:
+Para desarrollo local, `npm run dev` carga un archivo `.env` en la raíz si existe. Cópialo de `.env.example` y pon en `JWT_SECRET` un valor aleatorio:
 
 ```powershell
-$env:JWT_SECRET = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Nunca lo guardes en un archivo versionado.
+`.env` está en el `.gitignore` y nunca se versiona. También puedes definir la variable solo en la terminal (`$env:JWT_SECRET = ...`) y no usar `.env`.
+
+Al detenerlo con Ctrl+C (o con `SIGTERM` en un servidor), deja terminar las peticiones en curso y cierra la base antes de salir.
 
 ## Interfaz Web (Frontend)
 

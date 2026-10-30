@@ -38,7 +38,19 @@ Una ruta, un campo de respuesta o un código de error nuevo o modificado de la A
 ## Estilos
 
 - Todo en `src/web/styles.css`, con clases planas en kebab-case. Sin CSS-in-JS ni atributos `style`, ni siquiera para valores calculados: una CSP estricta los bloquea. Un tamaño calculado va como atributo SVG, como las barras de `TrendChart`.
-- Colores solo con las variables de `:root` (`--bg`, `--surface`, `--text`, `--muted`, `--border`, `--accent`, `--accent-text`, `--danger`, `--danger-text`, `--notice-bg`). Un color nuevo se define en `:root` y también en el bloque `prefers-color-scheme: dark`.
+- Colores solo con las variables del bloque `:root` de `styles.css`. Un color nuevo se define en `:root` y también en el bloque `prefers-color-scheme: dark`.
 - El texto sobre un fondo de color usa su variable pareja (`--accent-text` sobre `--accent`, `--danger-text` sobre `--danger`), nunca un color fijo. `src/web/__tests__/styles.test.ts` verifica el contraste AA (4.5:1) en los dos temas: una combinación nueva de texto y fondo se agrega a su lista `PAIRS`.
-- El foco de teclado lo marca la regla `:focus-visible`; no quitar el `outline` de ningún elemento.
+- El foco de teclado lo marca la regla `:focus-visible`; no quitar el `outline` de ningún elemento (un halo con `box-shadow` puede acompañarlo, no reemplazarlo).
+- Animaciones solo con `@keyframes` y clases, nunca con `style`. El bloque `prefers-reduced-motion: reduce` al final de `styles.css` las apaga para quien lo pide; no saltárselo. Números que cuentan hacia arriba: `useCountUp`.
+- En SVG escalados con `viewBox` (como las barras), una animación de `transform` usa `animation-fill-mode: backwards`, no `both`: un `transform` que queda fijo deja la figura borrosa.
+- Nada de pseudo-elementos con `z-index` negativo dentro de un elemento que se anima con `transform`: se pintan encima de su fondo, no detrás. Para un halo, `box-shadow`.
+
+## Íconos
+
+- Solo con `Icon` de `src/web/components/Icon.tsx`, que trae los trazos de Lucide copiados (licencia ISC). Un ícono nuevo se agrega a ese mapa copiando su SVG de lucide.dev. No instalar `lucide-react` sin revisión del equipo.
+- Son decorativos (`aria-hidden`): el texto del botón o del campo da el nombre accesible, así que un botón nunca lleva solo un ícono sin texto o `aria-label`.
+
+## Refresco automático
+
+- `Dashboard` refresca solo las métricas cada `METRICS_REFRESH_MS` (30 s) y se salta el ciclo si la pestaña está oculta. La lista no se refresca sola: perdería las páginas cargadas con "Cargar más".
 - Diseño adaptable con los cortes existentes: `max-width: 900px` (tablet vertical) y `max-width: 600px` (celular). En esos anchos las tablas pasan a tarjetas, sin scroll horizontal.

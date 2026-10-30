@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { lazyStatement } from '../../shared/db.ts';
 
 export interface UserRecord {
   id: number;
@@ -38,24 +39,23 @@ function toRecord(row: UserRow): UserRecord {
   };
 }
 
-// Igual que en urls: se prepara en cada llamada para no exigir la tabla al arrancar.
 export function createUsersRepository(db: DatabaseSync): UsersRepository {
+  const insert = lazyStatement(
+    db,
+    `INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)
+     ON CONFLICT (email) DO NOTHING
+     RETURNING id, email, password_hash, name, created_at`,
+  );
+  const findByEmail = lazyStatement(db, 'SELECT id, email, password_hash, name, created_at FROM users WHERE email = ?');
+
   return {
     insert({ email, passwordHash, name }) {
-      const row = db
-        .prepare(
-          `INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)
-           ON CONFLICT (email) DO NOTHING
-           RETURNING id, email, password_hash, name, created_at`,
-        )
-        .get(email, passwordHash, name) as UserRow | undefined;
+      const row = insert().get(email, passwordHash, name) as UserRow | undefined;
       return row ? toRecord(row) : undefined;
     },
 
     findByEmail(email) {
-      const row = db
-        .prepare('SELECT id, email, password_hash, name, created_at FROM users WHERE email = ?')
-        .get(email) as UserRow | undefined;
+      const row = findByEmail().get(email) as UserRow | undefined;
       return row ? toRecord(row) : undefined;
     },
   };

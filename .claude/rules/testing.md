@@ -11,7 +11,7 @@ paths:
 - Vitest con dos proyectos (`vitest.config.ts`): `backend` corre en Node los `src/**/__tests__/**/*.test.ts` fuera de `src/web`, y `web` corre en jsdom los `src/web/**/__tests__/**/*.test.{ts,tsx}`.
 - Los tests van en `__tests__/` junto al módulo: `src/modules/<nombre>/__tests__/<nombre>.test.ts` o `src/web/__tests__/`.
 - Sin globals de Vitest: importar `describe`, `it`, `expect`, `vi` de `vitest` en cada archivo.
-- Correr uno: `npx vitest run <archivo>`, `npx vitest run --project backend` o `-t "nombre del test"`. Antes de dar algo por terminado: `npm test` y `npm run typecheck`.
+- Correr uno: `npx vitest run <archivo>`, `npx vitest run --project backend` o `-t "nombre del test"`. Antes de dar algo por terminado y antes de cada commit: `npm run verify` (typecheck y tests).
 
 ## Nombres
 
@@ -29,7 +29,7 @@ paths:
 ## SPA
 
 - Testing Library + `userEvent`: renderizar `<SessionProvider><App /></SessionProvider>` o el componente, e interactuar como el usuario. Buscar por rol, etiqueta o texto visible (`getByRole`, `getByLabelText`); nada de selectores CSS ni `data-testid`.
-- La red es el único borde que se simula, con `mockFetch` de `__tests__/fetch-mock.ts`: cada clave es `"MÉTODO ruta"` tal como la pide la SPA. Una petición no declarada hace fallar el test, así que se declaran todas las que el flujo dispara.
+- La red es el único borde que se simula, con `mockFetch` de `__tests__/fetch-mock.ts`: cada clave es `"MÉTODO ruta"` tal como la pide la SPA. Una petición no declarada hace fallar el test, así que se declaran todas las que el flujo dispara. Para probar una respuesta que llega tarde, el handler devuelve una promesa que el test resuelve cuando quiere.
 - Tokens con `fakeToken(segundos)`; datos con las fábricas `ana`, `urlItem`, `overview`. Si cambia el contrato de la API, se actualizan las fábricas.
 - `setup.ts` desmonta y quita los stubs globales después de cada test; no repetirlo en cada archivo.
 

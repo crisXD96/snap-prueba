@@ -37,5 +37,7 @@ Una ruta, un campo de respuesta o un código de error nuevo o modificado de la A
 ## Estilos
 
 - Todo en `src/web/styles.css`, con clases planas en kebab-case. Sin CSS-in-JS ni estilos inline salvo valores calculados (p. ej. la altura de una barra de la gráfica).
-- Colores solo con las variables de `:root` (`--bg`, `--surface`, `--text`, `--muted`, `--border`, `--accent`, `--danger`, `--notice-bg`). Un color nuevo se define en `:root` y también en el bloque `prefers-color-scheme: dark`.
+- Colores solo con las variables de `:root` (`--bg`, `--surface`, `--text`, `--muted`, `--border`, `--accent`, `--accent-text`, `--danger`, `--danger-text`, `--notice-bg`). Un color nuevo se define en `:root` y también en el bloque `prefers-color-scheme: dark`.
+- El texto sobre un fondo de color usa su variable pareja (`--accent-text` sobre `--accent`, `--danger-text` sobre `--danger`), nunca un color fijo. `src/web/__tests__/styles.test.ts` verifica el contraste AA (4.5:1) en los dos temas: una combinación nueva de texto y fondo se agrega a su lista `PAIRS`.
+- El foco de teclado lo marca la regla `:focus-visible`; no quitar el `outline` de ningún elemento.
 - Diseño adaptable con los cortes existentes: `max-width: 900px` (tablet vertical) y `max-width: 600px` (celular). En esos anchos las tablas pasan a tarjetas, sin scroll horizontal.

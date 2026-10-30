@@ -7,6 +7,7 @@ import { createDashboardRouter } from './modules/dashboard/dashboard.routes.ts';
 import { healthRouter } from './modules/health/health.routes.ts';
 import { createUrlsRouter } from './modules/urls/urls.routes.ts';
 import { createWebRouter } from './modules/web/web.routes.ts';
+import { errorHandler } from './shared/error.middleware.ts';
 
 // Separada de server.ts para que los tests levanten la app sin fijar un puerto.
 // La conexión y el secreto llegan desde fuera para que los tests usen los suyos.
@@ -23,5 +24,6 @@ export function createApp(db: DatabaseSync, jwtSecret: string, webDir?: string):
   if (webDir !== undefined) {
     app.use(createWebRouter(webDir));
   }
+  app.use(errorHandler);
   return app;
 }

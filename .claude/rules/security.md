@@ -41,5 +41,5 @@ Estas reglas complementan `SECURITY.md`. Si un cambio afecta alguna de las prác
 ## Dependencias
 
 - No instalar dependencias. Proponer el cambio a `package.json` con el motivo para que lo revise el equipo.
-- Las vulnerabilidades conocidas de `vitest` y `tinypool` son solo de desarrollo y están documentadas en `SECURITY.md`. Ante una alerta nueva, `npm audit --omit=dev` dice si toca producción; si la toca, se reporta al usuario antes de seguir con otra tarea.
-- Las actualizaciones de Dependabot que cambian de versión mayor se validan con `npm run verify` sobre la rama del PR antes de aceptarlas.
+- Ante una alerta de seguridad, `npm audit --omit=dev` dice si toca producción; si la toca, se reporta al usuario antes de seguir con otra tarea. Una vulnerabilidad conocida que no se corrige se documenta en "Limitaciones conocidas" de `SECURITY.md`.
+- Las actualizaciones de Dependabot que cambian de versión mayor se validan con `npm ci` y `npm run verify` en un worktree aparte, sobre la rama actual, antes de aceptarlas.
